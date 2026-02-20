@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API = axios.create({
     baseURL: 'http://localhost:8000',
-    timeout: 30000,
+    timeout: 60000,
 });
 
 API.interceptors.request.use((config) => {
@@ -46,4 +46,15 @@ export const getStudentStats = () => API.get('/student/stats');
 export const getBatches = () => API.get('/student/batches');
 export const markPlaced = (usn) => API.put(`/student/${usn}/mark-placed`);
 
+// ── Scheduler ────────────────────────────────────────────────────
+export const generateSchedule = (data) => API.post('/scheduler/generate', data);
+export const updateScheduleSlot = (data) => API.put('/scheduler/update-slot', data);
+export const notifySchedule = (data) => API.post('/scheduler/notify', data);
+
+// ── Resume Engine ──────────────────────────────────────────────────
+// ── Resume Engine ──────────────────────────────────────────────────
+export const uploadDocxTemplate = (fd) => API.post('/resume/upload-docx', fd);
+export const uploadAIPdfTemplate = (fd) => API.post('/resume/upload-ai-pdf', fd);
+export const getTemplates = () => API.get('/resume/list');
+export const deleteTemplate = (id) => API.delete(`/resume/${id}`);
 export default API;

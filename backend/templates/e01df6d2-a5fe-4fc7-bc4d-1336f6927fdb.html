@@ -1,0 +1,423 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ name }}'s Resume</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+            display: flex;
+            justify-content: center;
+        }
+
+        .resume-container {
+            width: 100%;
+            max-width: 850px;
+            background-color: #fff;
+            padding: 40px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        header h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 2.8em;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .contact-info span, .contact-info a {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+            color: #555;
+            transition: color 0.3s ease;
+        }
+
+        .contact-info a:hover {
+            color: #007bff;
+        }
+
+        /* Emojis for icons */
+        .contact-info span:nth-of-type(1)::before { content: '📍 '; } /* Location */
+        .contact-info span:nth-of-type(2)::before { content: '📞 '; } /* Phone */
+        .contact-info a:nth-of-type(1)::before { content: '✉️ '; } /* Email */
+        .contact-info a:nth-of-type(2)::before { content: '🌐 '; } /* Portfolio */
+        .contact-info a:nth-of-type(3)::before { content: '🔗 '; } /* LinkedIn */
+
+
+        section {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        h2 {
+            color: #34495e;
+            font-size: 1.8em;
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #eee;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .summary p {
+            font-size: 1.1em;
+            color: #444;
+            margin-bottom: 0;
+        }
+
+        .item-card {
+            margin-bottom: 20px;
+            padding: 15px 0;
+            border-bottom: 1px dotted #eee;
+        }
+
+        .item-card:last-of-type {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        .item-card h3 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            font-size: 1.3em;
+        }
+
+        .item-card h4 {
+            margin: 0 0 5px 0;
+            color: #555;
+            font-size: 1.1em;
+            font-weight: normal;
+        }
+
+        .item-card .details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: #777;
+            margin-bottom: 10px;
+        }
+
+        .item-card ul {
+            list-style-type: disc;
+            margin: 0;
+            padding: 0 0 0 20px;
+            color: #444;
+        }
+
+        .item-card ul li {
+            margin-bottom: 5px;
+        }
+        
+        .additional-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .additional-info-grid > div {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-left: 3px solid #007bff;
+            border-radius: 4px;
+        }
+
+        .additional-info-grid h3 {
+            margin-top: 0;
+            color: #34495e;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .additional-info-grid ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            font-size: 0.95em;
+        }
+
+        .additional-info-grid ul li {
+            margin-bottom: 3px;
+            padding-left: 15px;
+            position: relative;
+        }
+        .additional-info-grid ul li::before {
+            content: '•';
+            color: #007bff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            position: absolute;
+            left: 0;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .resume-container {
+                padding: 20px;
+            }
+            header h1 {
+                font-size: 2em;
+            }
+            .contact-info {
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+            }
+            h2 {
+                font-size: 1.5em;
+            }
+            .item-card .details {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .item-card .details span:first-child {
+                margin-bottom: 5px;
+            }
+            .additional-info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="resume-container">
+        <!-- 
+            Expected Jinja2 Context Data Structure:
+            name: "P PRAJWAL",
+            profile: {
+                location: "Manglore, D.K, Karnataka",
+                phone: "911 068 7983",
+                email: "prajwalganiga06@gmail.com",
+                portfolio: "prajwalganiga.github.io/Prajwal-portfolio",
+                linkedin: "linkedin.com/in/prajwalganiga",
+                summary: "Motivated engineering student with a passion for technology and problem-solving. Skilled in programming, development, and adapting to new challenges. Focused, driven, and committed to continuous learning and innovation",
+                experience: [
+                    {
+                        title: "Full Stack Development Intern",
+                        company: "Swizosoft Pvt. Ltd.",
+                        mentor: "Aditya Madhukar Bhat",
+                        dates: "1st April - 31st May",
+                        responsibilities: [
+                            "Built dynamic web applications using Flask, MongoDB, HTML, CSS, and JavaScript.",
+                            "Gained hands-on experience in full-stack development and deployment of web apps"
+                        ]
+                    },
+                    {
+                        title: "Deep Learning Intern",
+                        company: "Dharini Academy",
+                        mentor: "Prashant Sir",
+                        dates: "21st April - 12th May",
+                        responsibilities: [
+                            "Learned and implemented Deep Learning concepts neural networks, CNNs, and model training.",
+                            "Worked on real-world datasets using Python, TensorFlow, and Keras"
+                        ]
+                    },
+                    {
+                        title: "Freelance Developer / Founder",
+                        company: "Do It For Me - (Self-Initiated Startup)",
+                        dates: "Start Date - Present",
+                        responsibilities: [
+                            "Work closely with clients to gather requirements, design UIs, Assignments and scalable apps.",
+                            "Delivered 5+ client projects, ensuring clean code, on-time delivery & post-deployment support."
+                        ]
+                    }
+                ],
+                projects: [
+                    {
+                        name: "Personalized Student Quiz Feedback System",
+                        description: "Developed for a Google Developers Group (GDG) Hackathon."
+                    },
+                    {
+                        name: "Smart Classroom",
+                        description: ""
+                    },
+                    {
+                        name: "Doctor-Patient Translator",
+                        description: "A project for a real-time multilingual text-to-speech medical assistant using Deep Learning."
+                    },
+                    {
+                        name: "FocusLy – ToDo App",
+                        description: "A productivity application featuring alerts, countdowns, history tracking, and task editing."
+                    }
+                ],
+                education: [
+                    {
+                        degree: "Bachelor of Computer Science and Design Engineering",
+                        institution: "Srinivas Institute of Technology",
+                        cgpa: "9.25",
+                        years: "2023 - 2027"
+                    },
+                    {
+                        degree: "Pre-University Course (PUC) - [PCMB]",
+                        institution: "Capitanio PU Composite",
+                        percentage: "88%",
+                        years: "2021 - 2023"
+                    }
+                ],
+                skills: {
+                    technical: [
+                        "Project Management", "Data Structural Analysis", "Deep Learning", "Python - [FastAPI]",
+                        "No Code Low Code", "Full-Stack Development"
+                    ],
+                    soft: [
+                        "Teamwork", "Time Management", "Leadership", "Effective Communication", "Critical thinking"
+                    ]
+                },
+                languages: ["English", "Hindi", "Kannada"],
+                certifications: ["Edu Skill Certificate", "Ethnotech Academic Solutions Certificate"],
+                awards_activities: [
+                    "Academic Excellence",
+                    "Received multiple awards for consistent academic performance",
+                    "Sports Champion in High School & PUC Athletics",
+                    "Member of the College Volleyball Team"
+                ]
+            }
+        }
+        -->
+        <header>
+            <h1>{{ name }}</h1>
+            <div class="contact-info">
+                <span>{{ profile.location }}</span>
+                <span>{{ profile.phone }}</span>
+                <a href="mailto:{{ profile.email }}">{{ profile.email }}</a>
+                <a href="{{ profile.portfolio }}" target="_blank" rel="noopener noreferrer">Portfolio</a>
+                <a href="{{ profile.linkedin }}" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+            </div>
+        </header>
+
+        <section class="summary">
+            <h2>Summary</h2>
+            <p>{{ profile.summary }}</p>
+        </section>
+
+        <section class="experience">
+            <h2>Experience</h2>
+            {% for exp in profile.experience %}
+            <div class="item-card">
+                <h3>{{ exp.title }}</h3>
+                <h4>{{ exp.company }} {% if exp.mentor %}&mdash; Mentored by {{ exp.mentor }}{% endif %}</h4>
+                <div class="details">
+                    <span>{{ exp.dates }}</span>
+                </div>
+                <ul>
+                    {% for responsibility in exp.responsibilities %}
+                    <li>{{ responsibility }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section class="projects">
+            <h2>Projects</h2>
+            {% for proj in profile.projects %}
+            <div class="item-card">
+                <h3>{{ proj.name }}</h3>
+                {% if proj.description %}
+                <ul>
+                    <li>{{ proj.description }}</li>
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </section>
+
+        <section class="education">
+            <h2>Education</h2>
+            {% for edu in profile.education %}
+            <div class="item-card">
+                <h3>{{ edu.degree }}</h3>
+                <h4>{{ edu.institution }}</h4>
+                <div class="details">
+                    <span>{% if edu.cgpa %}Holding a CGPA of {{ edu.cgpa }}{% elif edu.percentage %}Percentage : {{ edu.percentage }}{% endif %}</span>
+                    <span>{{ edu.years }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section class="additional-information">
+            <h2>Additional Information</h2>
+            <div class="additional-info-grid">
+                <div>
+                    <h3>Technical Skills</h3>
+                    <ul>
+                        {% for skill in profile.skills.technical %}
+                        <li>{{ skill }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>
+                    <h3>Soft Skills</h3>
+                    <ul>
+                        {% for skill in profile.skills.soft %}
+                        <li>{{ skill }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>
+                    <h3>Languages</h3>
+                    <ul>
+                        {% for lang in profile.languages %}
+                        <li>{{ lang }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>
+                    <h3>Certifications</h3>
+                    <ul>
+                        {% for cert in profile.certifications %}
+                        <li>{{ cert }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>
+                    <h3>Awards/Activities</h3>
+                    <ul>
+                        {% for award in profile.awards_activities %}
+                        <li>{{ award }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

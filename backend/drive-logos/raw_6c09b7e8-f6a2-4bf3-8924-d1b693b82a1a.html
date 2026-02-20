@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ name }} - Resume</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        header h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 2.8em;
+            letter-spacing: 1px;
+        }
+        header p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 1em;
+        }
+        header a {
+            color: #007bff;
+            text-decoration: none;
+            margin: 0 5px;
+        }
+        header a:hover {
+            text-decoration: underline;
+        }
+        section {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #eee;
+        }
+        section:last-of-type {
+            border-bottom: none;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            font-size: 1.6em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-size: 1.2em;
+            display: inline-block; /* For proper alignment with date */
+        }
+        h4 {
+            color: #555;
+            margin: 0;
+            font-size: 1em;
+            font-weight: normal;
+        }
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 5px;
+        }
+        .meta-info span {
+            font-style: italic;
+            color: #777;
+            font-size: 0.9em;
+        }
+        ul {
+            list-style-type: disc;
+            margin: 0 0 10px 20px;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .sub-section {
+            margin-bottom: 15px;
+        }
+        .skill-category {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-right: 5px;
+        }
+        .additional-info p {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ name }}</h1>
+            <p>
+                Manglore, D.K, Karnataka • 911 068 7983 • <a href="mailto:{{ email }}">{{ email }}</a>
+            </p>
+            <p>
+                <a href="https://prajwalganiga.github.io/Prajwal-portfolio" target="_blank">Portfolio</a> |
+                <a href="https://linkedin.com/in/prajwalganiga" target="_blank">LinkedIn</a>
+            </p>
+        </header>
+
+        <section>
+            <h2>Summary</h2>
+            <p>Motivated engineering student with a passion for technology and problem-solving. Skilled in programming, development, and adapting to new challenges. Focused, driven, and committed to continuous learning and innovation.</p>
+        </section>
+
+        <section>
+            <h2>Experience</h2>
+            {% for exp in experience %}
+            <div class="sub-section">
+                <div class="meta-info">
+                    <h3>{{ exp.role }}</h3>
+                    <span>{{ exp.duration }}</span>
+                </div>
+                <h4>{{ exp.company }}</h4>
+                <ul>
+                    {% for detail in exp.description_points %}
+                    <li>{{ detail }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section>
+            <h2>Projects</h2>
+            {% for proj in projects %}
+            <div class="sub-section">
+                <h3>{{ proj.name }}</h3>
+                {% if proj.description %}
+                <p>{{ proj.description }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </section>
+
+        <section>
+            <h2>Education</h2>
+            <div class="sub-section">
+                <div class="meta-info">
+                    <h3>Bachelor of Computer Science and Design Engineering</h3>
+                    <span>2023 - 2027</span>
+                </div>
+                <h4>Srinivas Institute of Technology</h4>
+                <p>Holding a CGPA of {{ cgpa }}</p>
+            </div>
+            <div class="sub-section">
+                <div class="meta-info">
+                    <h3>Pre-University Course (PUC) - [PCMB]</h3>
+                    <span>2021 - 2023</span>
+                </div>
+                <h4>Capitanio PU Composite</h4>
+                <p>Percentage : 88%</p>
+            </div>
+        </section>
+
+        <section class="additional-info">
+            <h2>Additional Information</h2>
+            <div class="sub-section">
+                <p><span class="skill-category">Technical Skills:</span> Project Management, Data Structural Analysis, Deep Learning, Python - [FastAPI], No Code Low Code, Full-Stack Development.</p>
+                <p><span class="skill-category">Soft Skills:</span> Teamwork, Time Management, Leadership, Effective Communication, Critical thinking.</p>
+                <p><span class="skill-category">Languages:</span> English, Hindi, Kannada</p>
+                <p><span class="skill-category">Certifications:</span> Edu Skill Certificate, Ethnotech Academic Solutions Certificate</p>
+                <p><span class="skill-category">Awards/Activities:</span> Academic Excellence, Received multiple awards for consistent academic performance, Sports Champion in High School & PUC Athletics & member of the "College Volleyball Team”</p>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

@@ -109,6 +109,36 @@ Job Description Text:
 {jd_text}
 """
 
+# ── Universal Eligibility Query Builder ──
+def get_eligibility_query(college_id: str, drive_doc: dict) -> dict:
+    """Consistently builds the exact MongoDB query for student eligibility."""
+    query = {
+        "college_id": college_id,
+        "cgpa": {"$gte": float(drive_doc.get("min_cgpa", 0))},
+        "backlogs": {"$lte": int(drive_doc.get("max_backlogs", 10))}
+    }
+    
+    if drive_doc.get("eligible_branches"):
+        query["branch"] = {"$in": drive_doc["eligible_branches"]}
+        
+    if drive_doc.get("target_batches"):
+        batch_years = [int(b) for b in drive_doc["target_batches"] if str(b).isdigit()]
+        if batch_years:
+            query["graduation_year"] = {"$in": batch_years}
+            
+    if drive_doc.get("gender_pref") and drive_doc.get("gender_pref") not in ("Any", ""):
+        query["gender"] = drive_doc["gender_pref"]
+        
+    if drive_doc.get("min_attendance_pct", 0) > 0:
+        query["attendance_pct"] = {"$gte": float(drive_doc["min_attendance_pct"])}
+        
+    if drive_doc.get("min_mock_score", 0) > 0:
+        query["mock_score"] = {"$gte": float(drive_doc["min_mock_score"])}
+        
+    # Optional: If you only want to allow unplaced students, uncomment below:
+    # query["placed"] = False 
+
+    return query
 
 def extract_pdf_text(file_bytes: bytes) -> str:
     reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
@@ -207,7 +237,7 @@ async def create_drive(
 
 @router.get("/list")
 async def list_drives(current_user: dict = Depends(get_current_user)):
-    """List all drives for this college, newest first, with applicant stats."""
+    """List all drives for this college, newest first, with accurate applicant stats."""
     try:
         db = get_db()
         college_id = current_user.get("college_id")
@@ -216,25 +246,8 @@ async def list_drives(current_user: dict = Depends(get_current_user)):
         
         for d in drives:
             d["_id"] = str(d["_id"])
-            
-            # 1. Calculate how many students are eligible for this specific drive
-            query = {
-                "college_id": college_id,
-                "cgpa": {"$gte": d.get("min_cgpa", 0)},
-                "backlogs": {"$lte": d.get("max_backlogs", 10)}
-            }
-            if d.get("eligible_branches"):
-                query["branch"] = {"$in": d["eligible_branches"]}
-            if d.get("target_batches"):
-                batch_years = [int(b) for b in d["target_batches"] if str(b).isdigit()]
-                if batch_years:
-                    query["graduation_year"] = {"$in": batch_years}
-            
-            eligible_count = await db["students"].count_documents(query)
-            d["eligible_count"] = eligible_count
-            
-            # 2. Count applied students (Mocking this until you build the student-facing app)
-            # If you add an 'applied_students' list to the DB later, it will read it here.
+            query = get_eligibility_query(college_id, d)
+            d["eligible_count"] = await db["students"].count_documents(query)
             d["applied_count"] = len(d.get("applied_students", []))
 
         return drives
@@ -242,43 +255,26 @@ async def list_drives(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"List drives failed: {str(e)}")
 
 @router.post("/check-eligibility")
-async def check_eligibility(
-    criteria: EligibilityCheck,
-    current_user: dict = Depends(get_current_user),
-):
-    """Count students matching all eligibility criteria."""
+async def check_eligibility(criteria: EligibilityCheck, current_user: dict = Depends(get_current_user)):
+    """Count students matching all eligibility criteria from the frontend form."""
     try:
         db = get_db()
-        query: dict = {
-            "college_id": criteria.college_id or current_user.get("college_id"),
-            "cgpa": {"$gte": criteria.min_cgpa},
-            "backlogs": {"$lte": criteria.max_backlogs},
-        }
-        if criteria.eligible_branches:
-            query["branch"] = {"$in": criteria.eligible_branches}
-        if criteria.target_batches:
-            # target_batches are strings like ["2025", "2026"]
-            batch_years = [int(b) for b in criteria.target_batches if b.isdigit()]
-            if batch_years:
-                query["graduation_year"] = {"$in": batch_years}
-        if criteria.gender_pref and criteria.gender_pref not in ("Any", ""):
-            query["gender"] = criteria.gender_pref
-        if criteria.min_attendance_pct > 0:
-            query["attendance_pct"] = {"$gte": criteria.min_attendance_pct}
-        if criteria.min_mock_score > 0:
-            query["mock_score"] = {"$gte": criteria.min_mock_score}
-
+        # Convert the Pydantic model to a dict so we can use our universal builder
+        criteria_dict = criteria.dict()
+        criteria_dict["min_attendance_pct"] = criteria.min_attendance_pct
+        criteria_dict["min_mock_score"] = criteria.min_mock_score
+        
+        query = get_eligibility_query(criteria.college_id or current_user.get("college_id"), criteria_dict)
         count = await db["students"].count_documents(query)
+        
         return {"eligible_count": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Eligibility check failed: {str(e)}")
 
 
 @router.post("/notify")
-async def notify_students(
-    req: NotifyRequest,
-    current_user: dict = Depends(get_current_user),
-):
+async def notify_students(req: NotifyRequest, current_user: dict = Depends(get_current_user)):
+    """Strictly notify ONLY eligible students."""
     try:
         db = get_db()
         from bson import ObjectId
@@ -286,16 +282,13 @@ async def notify_students(
         if not drive_doc:
             raise HTTPException(status_code=404, detail="Drive not found")
 
-        # 1. Fetch eligible students for the logs
-        query: dict = {
-            "college_id": req.college_id,
-            "cgpa": {"$gte": drive_doc.get("min_cgpa", 0)},
-            "backlogs": {"$lte": drive_doc.get("max_backlogs", 10)},
-        }
-        if drive_doc.get("eligible_branches"):
-            query["branch"] = {"$in": drive_doc["eligible_branches"]}
-
+        # 1. Fetch strictly eligible students
+        query = get_eligibility_query(req.college_id, drive_doc)
         students = await db["students"].find(query, {"name": 1, "email": 1}).to_list(length=1000)
+
+        # 🚨 THE FIX: Abort instantly if nobody is eligible
+        if not students:
+            raise HTTPException(status_code=400, detail="0 students are eligible for this drive. No emails sent.")
 
         real_sent = []
         logged = []
@@ -303,7 +296,6 @@ async def notify_students(
 
         print("\n🚀 --- STARTING EMAIL DISPATCH ---")
 
-        # 2. FORCE SEND REAL EMAILS TO YOUR 3 TESTERS
         html = f"""
         <div style="font-family:Inter,sans-serif;max-width:520px;margin:auto;
                     background:#0f172a;padding:32px;border-radius:12px;color:#e2e8f0">
@@ -320,29 +312,21 @@ async def notify_students(
         </div>
         """
 
+        # 2. Only send to test emails IF the system found eligible students
         for test_email in REAL_EMAIL_RECIPIENTS:
-            msg = MessageSchema(
-                subject=f"Placement Drive Alert – {drive_doc.get('company_name','')}",
-                recipients=[test_email],
-                body=html,
-                subtype="html",
-            )
+            msg = MessageSchema(subject=f"Placement Drive Alert – {drive_doc.get('company_name','')}", recipients=[test_email], body=html, subtype="html")
             try:
                 await fm.send_message(msg)
                 real_sent.append(test_email)
-                print(f"✅ SUCCESS: Real email sent to test address → {test_email}")
             except Exception as mail_err:
                 print(f"❌ ERROR: Failed to send to {test_email}. Reason: {mail_err}")
 
-        # 3. LOG THE ACTUAL DB STUDENTS TO TERMINAL
-        print("\n📋 --- LOGGING DB STUDENTS ---")
+        # 3. Log real database students
         for s in students:
             email = s.get("email", "")
             name = s.get("name", "Student")
             print(f"📋 LOG ONLY: Would have sent to → {name} <{email}>")
             logged.append(email)
-
-        print("🏁 --- DISPATCH COMPLETE ---\n")
 
         return {
             "message": "Notifications dispatched",
@@ -350,8 +334,9 @@ async def notify_students(
             "real_emails_sent": len(real_sent),
             "logged_count": len(logged),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"🚨 CRITICAL NOTIFY ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Notify failed: {str(e)}")
 
 

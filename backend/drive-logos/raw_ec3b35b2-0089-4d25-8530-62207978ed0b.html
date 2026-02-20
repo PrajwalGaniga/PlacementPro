@@ -1,0 +1,310 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ name }}'s Resume</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #333;
+            --secondary-color: #555;
+            --accent-color: #007BFF;
+            --background-color: #f9f9f9;
+            --border-color: #eee;
+            --font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: var(--primary-color);
+            display: flex;
+            justify-content: center;
+        }
+
+        .resume-container {
+            width: 100%;
+            max-width: 900px;
+            background: #fff;
+            padding: 40px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.8em;
+            color: var(--primary-color);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .contact-info {
+            margin-top: 10px;
+            font-size: 0.95em;
+            color: var(--secondary-color);
+        }
+
+        .contact-info span {
+            margin: 0 8px;
+            white-space: nowrap;
+        }
+
+        .contact-info a {
+            color: var(--accent-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .contact-info a:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+
+        section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        section:last-of-type {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        h3 {
+            font-size: 1.3em;
+            color: var(--accent-color);
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        h4 {
+            font-size: 1.1em;
+            color: var(--primary-color);
+            margin: 0;
+            font-weight: 400;
+        }
+
+        .item-details {
+            margin-left: 20px;
+            margin-bottom: 10px;
+            color: var(--secondary-color);
+            font-size: 0.95em;
+        }
+
+        .item-details p {
+            margin: 5px 0;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        ul li {
+            margin-bottom: 8px;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        ul li::before {
+            content: '•';
+            color: var(--accent-color);
+            position: absolute;
+            left: 0;
+        }
+
+        .skills-list, .additional-info-list {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .skills-list span {
+            background-color: #e9f5ff;
+            color: var(--accent-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin: 0 8px 8px 0;
+            font-size: 0.9em;
+        }
+
+        .experience-item, .education-item, .project-item {
+            margin-bottom: 20px;
+        }
+
+        .experience-header, .education-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .experience-header h3, .education-header h3 {
+            margin-bottom: 0;
+        }
+
+        .experience-header span, .education-header span {
+            font-size: 0.9em;
+            color: var(--secondary-color);
+            font-weight: normal;
+        }
+
+        .project-description, .experience-description {
+            margin-top: 5px;
+            color: var(--secondary-color);
+            font-size: 0.95em;
+        }
+        .summary-text {
+            font-size: 1.05em;
+            line-height: 1.6;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="resume-container">
+        <header>
+            <h1>{{ name }}</h1>
+            <div class="contact-info">
+                <span>Manglore, D.K, Karnataka</span> •
+                <span>911 068 7983</span> •
+                <span><a href="mailto:{{ email }}">{{ email }}</a></span><br>
+                <span>Portfolio: <a href="https://prajwalganiga.github.io/Prajwal-portfolio" target="_blank">prajwalganiga.github.io/Prajwal-portfolio</a></span> •
+                <span>LinkedIn: <a href="https://linkedin.com/in/prajwalganiga" target="_blank">linkedin.com/in/prajwalganiga</a></span>
+            </div>
+        </header>
+
+        <section id="summary">
+            <h2>SUMMARY</h2>
+            <p class="summary-text">Motivated engineering student with a passion for technology and problem-solving. Skilled in programming, development, and adapting to new challenges. Focused, driven, and committed to continuous learning and innovation.</p>
+        </section>
+
+        <section id="experience">
+            <h2>EXPERIENCE</h2>
+            {% for exp in experience %}
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>{{ exp.role }}</h3>
+                    <span>{{ exp.duration }}</span>
+                </div>
+                <h4>{{ exp.company }}</h4>
+                {% if exp.mentor %}
+                <p class="item-details">Mentored by {{ exp.mentor }}</p>
+                {% endif %}
+                <ul class="experience-description">
+                    {% for detail in exp.description %}
+                    <li>{{ detail }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section id="projects">
+            <h2>PROJECTS</h2>
+            {% for proj in projects %}
+            <div class="project-item">
+                <h3>{{ proj.name }}</h3>
+                {% if proj.description %}
+                <p class="project-description">{{ proj.description }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </section>
+
+        <section id="education">
+            <h2>EDUCATION</h2>
+            <div class="education-item">
+                <div class="education-header">
+                    <h3>Bachelor of Computer Science and Design Engineering</h3>
+                    <span>2023 - 2027</span>
+                </div>
+                <h4>Srinivas Institute of Technology</h4>
+                <p class="item-details">Holding a CGPA of {{ cgpa }}</p>
+            </div>
+            <div class="education-item">
+                <div class="education-header">
+                    <h3>Pre-University Course (PUC) - [PCMB]</h3>
+                    <span>2021 - 2023</span>
+                </div>
+                <h4>Capitanio PU Composite</h4>
+                <p class="item-details">Percentage : 88%</p>
+            </div>
+        </section>
+
+        <section id="additional-info">
+            <h2>ADDITIONAL INFORMATION</h2>
+            <div>
+                <h3>Technical Skills:</h3>
+                <div class="skills-list">
+                    <span>Project Management</span>
+                    <span>Data Structural Analysis</span>
+                    <span>Deep Learning</span>
+                    <span>Python - [FastAPI]</span>
+                    <span>No Code Low Code</span>
+                    <span>Full-Stack Development</span>
+                </div>
+            </div>
+            <div>
+                <h3>Soft Skills:</h3>
+                <div class="skills-list">
+                    <span>Teamwork</span>
+                    <span>Time Management</span>
+                    <span>Leadership</span>
+                    <span>Effective Communication</span>
+                    <span>Critical thinking</span>
+                </div>
+            </div>
+            <div>
+                <h3>Languages:</h3>
+                <div class="skills-list">
+                    <span>English</span>
+                    <span>Hindi</span>
+                    <span>Kannada</span>
+                </div>
+            </div>
+            <div>
+                <h3>Certifications:</h3>
+                <div class="skills-list">
+                    <span>Edu Skill Certificate</span>
+                    <span>Ethnotech Academic Solutions Certificate</span>
+                </div>
+            </div>
+            <div>
+                <h3>Awards/Activities:</h3>
+                <ul class="additional-info-list">
+                    <li>Academic Excellence</li>
+                    <li>Received multiple awards for consistent academic performance</li>
+                    <li>Sports Champion in High School & PUC Athletics</li>
+                    <li>Member of the "College Volleyball Team"</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

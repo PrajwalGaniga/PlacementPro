@@ -1,15 +1,19 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     BrainCircuit, LayoutDashboard, PlusCircle, Briefcase,
-    Users, LogOut,
+    Users, LogOut, CalendarDays,FileCode2
 } from 'lucide-react';
 import styles from './Layout.module.css';
+
+// ... rest of your code ...
 
 const NAV_ITEMS = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/dashboard/drives/create', icon: PlusCircle, label: 'Create Drive' },
     { to: '/dashboard/drives', icon: Briefcase, label: 'Active Drives' },
     { to: '/dashboard/students', icon: Users, label: 'Students' },
+    { to: '/dashboard/scheduler', icon: CalendarDays, label: 'Scheduler' },
+    { to: '/dashboard/templates', icon: FileCode2, label: 'Resume Templates' },
 ];
 
 const PAGE_TITLES = {
@@ -17,6 +21,8 @@ const PAGE_TITLES = {
     '/dashboard/drives/create': 'Create Drive',
     '/dashboard/drives': 'Active Drives',
     '/dashboard/students': 'Student List',
+    '/dashboard/scheduler': 'Interview Scheduler',
+    
 };
 
 export default function Layout() {

@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import DriveCreator from './pages/DriveCreator/DriveCreator';
 import DriveList from './pages/DriveList/DriveList';
 import StudentList from './pages/StudentList/StudentList';
+import SchedulerView from './pages/SchedulerView/SchedulerView';
+import TemplateManager from './pages/TemplateManager/TemplateManager';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -23,10 +25,14 @@ export default function App() {
           </PrivateRoute>
         }
       >
+        {/* Fix: Wrapped TemplateManager in a Route properly */}
+        <Route path="templates" element={<TemplateManager />} />
+        
         <Route index element={<Dashboard />} />
         <Route path="drives/create" element={<DriveCreator />} />
         <Route path="drives" element={<DriveList />} />
         <Route path="students" element={<StudentList />} />
+        <Route path="scheduler" element={<SchedulerView />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

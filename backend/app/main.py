@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.database import connect_db, close_db
-from app.routes import tpo, drive, student
+from app.routes import tpo, drive, student,scheduler,top_resume
 import os
 
 app = FastAPI(
@@ -39,7 +39,8 @@ async def shutdown_event():
 app.include_router(tpo.router)
 app.include_router(drive.router)
 app.include_router(student.router)
-
+app.include_router(scheduler.router)
+app.include_router(top_resume.router)
 
 @app.get("/")
 async def root():
