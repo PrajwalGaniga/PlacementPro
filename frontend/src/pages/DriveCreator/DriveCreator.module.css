@@ -1,0 +1,423 @@
+/* DriveCreator v2 – 4-category stepper */
+.page {
+    animation: fadeIn 0.4s ease both;
+}
+
+.pageHeader {
+    margin-bottom: 28px;
+}
+
+.pageHeader h1 {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.pageHeader p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* ── Upload bar ── */
+.uploadBar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 28px;
+    align-items: stretch;
+}
+
+.dropZone {
+    flex: 1;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: border-color var(--transition), background var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.dropZone.dragging {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.dropZone:hover {
+    border-color: var(--border-highlight);
+}
+
+.fileInput {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
+
+.dropText {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.dropSub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.parsedBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: var(--emerald);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.logoZone {
+    width: 140px;
+    flex-shrink: 0;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color var(--transition);
+}
+
+.logoZone:hover {
+    border-color: var(--border-highlight);
+}
+
+.logoPreview {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.logoText {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* ── Stepper tabs ── */
+.stepper {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    overflow: hidden;
+}
+
+.stepTab {
+    flex: 1;
+    padding: 14px 8px;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+    border-right: 1px solid var(--border);
+    transition: background var(--transition), color var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    position: relative;
+}
+
+.stepTab:last-child {
+    border-right: none;
+}
+
+.stepTab.active {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent-light);
+}
+
+.stepTab.hasPending::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--rose);
+}
+
+/* ── Form panel ── */
+.formPanel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: 28px;
+    animation: fadeIn 0.25s ease both;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 700px) {
+    .formRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+.formGroup {
+    margin-bottom: 18px;
+}
+
+.label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 7px;
+}
+
+.pendingDot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--rose);
+    flex-shrink: 0;
+}
+
+/* Inputs */
+.input,
+.select,
+.textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+    color: var(--text-muted);
+}
+
+/* Pending = red border */
+.pending {
+    border-color: rgba(244, 63, 94, 0.6) !important;
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.15) !important;
+}
+
+/* Typing cursor animation */
+.typing::after {
+    content: '|';
+    animation: blink 0.7s step-start infinite;
+    color: var(--accent);
+    font-weight: 400;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+.textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* Branch chips */
+.chipGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+}
+
+.chip.selected {
+    background: rgba(99, 102, 241, 0.18);
+    border-color: var(--accent);
+    color: var(--accent-light);
+    font-weight: 700;
+}
+
+/* ── Bottom bar ── */
+.bottomBar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.eligBanner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.22);
+    border-radius: var(--radius-sm);
+    flex: 1;
+    min-width: 180px;
+}
+
+.eligCount {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--emerald);
+}
+
+.eligLabel {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.btnPrimary {
+    padding: 12px 28px;
+    background: var(--gradient-brand);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity var(--transition), transform var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btnPrimary:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btnPrimary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btnSecondary {
+    padding: 11px 20px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btnSecondary:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent-light);
+}
+
+.btnSecondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--emerald);
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    animation: fadeIn 0.3s ease;
+}
+
+.error {
+    background: rgba(244, 63, 94, 0.08);
+    border: 1px solid rgba(244, 63, 94, 0.25);
+    color: #fb7185;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.navRow {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.pendingWarning {
+    font-size: 11px;
+    color: var(--rose);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+}

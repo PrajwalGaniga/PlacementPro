@@ -1,0 +1,190 @@
+/* StudentList.module.css */
+.page {
+    animation: fadeIn 0.4s ease both;
+}
+
+.pageHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.pageHeader h1 {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.pageHeader p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.toolbar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.searchWrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.searchIcon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.searchInput {
+    padding: 10px 14px 10px 38px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    width: 240px;
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.searchInput:focus {
+    border-color: var(--accent);
+}
+
+.searchInput::placeholder {
+    color: var(--text-muted);
+}
+
+.select {
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition);
+}
+
+.select:focus {
+    border-color: var(--accent);
+}
+
+/* Table */
+.tableWrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th {
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    white-space: nowrap;
+}
+
+.table td {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+.table tr:last-child td {
+    border-bottom: none;
+}
+
+.table tbody tr:hover {
+    background: var(--bg-card-hover);
+}
+
+.cgpa {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cgpa.high {
+    color: var(--emerald);
+}
+
+.cgpa.mid {
+    color: var(--amber);
+}
+
+.cgpa.low {
+    color: var(--rose);
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge.placed {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--emerald);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge.notPlaced {
+    background: rgba(71, 85, 105, 0.2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+
+.branchBadge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent-light);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.loading {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-muted);
+}
+
+.empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.count {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    text-align: right;
+}
