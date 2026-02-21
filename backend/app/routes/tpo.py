@@ -4,6 +4,7 @@ from app.models.tpo import OTPRequest, OTPVerify
 from app.utils.otp import send_otp, verify_otp
 from app.utils.jwt_handler import create_access_token
 from app.utils.auth import get_current_user
+from app.utils.student_auth import get_current_student
 
 router = APIRouter(prefix="/tpo", tags=["TPO"])
 

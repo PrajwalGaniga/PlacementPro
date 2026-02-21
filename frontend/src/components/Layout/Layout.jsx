@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     BrainCircuit, LayoutDashboard, PlusCircle, Briefcase,
-    Users, LogOut, CalendarDays,FileCode2
+    Users, LogOut, CalendarDays, FileCode2, GraduationCap
 } from 'lucide-react';
 import styles from './Layout.module.css';
 
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
     { to: '/dashboard/students', icon: Users, label: 'Students' },
     { to: '/dashboard/scheduler', icon: CalendarDays, label: 'Scheduler' },
     { to: '/dashboard/templates', icon: FileCode2, label: 'Resume Templates' },
+    { to: '/dashboard/alumni', icon: GraduationCap, label: 'Alumni Connect' },
 ];
 
 const PAGE_TITLES = {
@@ -22,7 +23,7 @@ const PAGE_TITLES = {
     '/dashboard/drives': 'Active Drives',
     '/dashboard/students': 'Student List',
     '/dashboard/scheduler': 'Interview Scheduler',
-    
+    '/dashboard/alumni': 'Alumni Connect',
 };
 
 export default function Layout() {

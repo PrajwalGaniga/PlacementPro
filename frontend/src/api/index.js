@@ -57,4 +57,19 @@ export const uploadDocxTemplate = (fd) => API.post('/resume/upload-docx', fd);
 export const uploadAIPdfTemplate = (fd) => API.post('/resume/upload-ai-pdf', fd);
 export const getTemplates = () => API.get('/resume/list');
 export const deleteTemplate = (id) => API.delete(`/resume/${id}`);
+
+
+// ── Admin Drive Applicants ─────────────────────────────────────────────────
+export const getDriveApplicants = (driveId) => API.get(`/admin/drives/${driveId}/applicants`);
+export const updateApplicantStatus = (applicationId, status) => API.put(`/admin/applications/${applicationId}/status`, { status });
+
+// ── Alumni Connect Portal ──────────────────────────────────────────────────
+export const getAlumniPending = () => API.get('/admin/alumni/pending');
+export const getAllAlumni = () => API.get('/admin/alumni/all');
+export const getAlumniStats = () => API.get('/admin/alumni/stats');
+export const verifyAlumni = (id, action) => API.put(`/admin/alumni/${id}/verify?action=${action}`);
+export const revokeAlumni = (id) => API.delete(`/admin/alumni/${id}`);
+export const getAlumniDetail = (id) => API.get(`/admin/alumni/${id}/detail`);
+
+
 export default API;

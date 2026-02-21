@@ -72,10 +72,15 @@ def get_eligibility_query(college_id: str, drive_doc: dict) -> dict:
 
 @router.post("/generate")
 async def generate_schedule(config: ScheduleConfig, current_user: dict = Depends(get_current_user)):
+
+    
     try:
         db = get_db()
         drive = await db["drives"].find_one({"_id": ObjectId(config.drive_id)})
         if not drive: raise HTTPException(status_code=404, detail="Drive not found")
+
+        if not config.end_date or config.end_date.strip() == "":
+            raise HTTPException(status_code=400, detail="End date cannot be empty")
 
         # Multi-Day Capacity Math
         start_d = datetime.strptime(config.start_date, "%Y-%m-%d").date()

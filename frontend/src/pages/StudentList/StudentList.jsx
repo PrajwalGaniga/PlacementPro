@@ -112,7 +112,7 @@ export default function StudentList() {
                                             <GraduationCap size={12} /> {s.batch_label || s.graduation_year || '—'}
                                         </span>
                                     </td>
-                                    <td><span className={`${styles.cgpa} ${cgpaClass(s.cgpa)}`}>{s.cgpa?.toFixed(2)}</span></td>
+                                    <td><span className={`${styles.cgpa} ${cgpaClass(s.cgpa)}`}>{parseFloat(s.cgpa || 0).toFixed(2)}</span></td>
                                     <td style={{ textAlign: 'center' }}>{s.backlogs}</td>
                                     <td>
                                         <span className={`${styles.badge} ${s.placed ? styles.placed : styles.notPlaced}`}>

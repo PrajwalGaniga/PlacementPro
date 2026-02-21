@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Join as Alumni | PlacementPro AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <style>
+        body {
+            background: radial-gradient(ellipse at 30% 10%, rgba(99, 102, 241, 0.12) 0%, transparent 60%), #0f172a;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .glass {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        input,
+        textarea {
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .step-line {
+            flex: 1;
+            height: 2px;
+        }
+
+        .slide {
+            display: none;
+        }
+
+        .slide.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen p-6">
+    <div class="w-full max-w-2xl mx-auto">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center gap-3 mb-5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 14l9-5-9-5-9 5 9 5z" />
+                    </svg>
+                </div>
+                <span class="font-bold text-white text-lg">PlacementPro AI</span>
+            </div>
+            <h1 class="text-3xl font-bold text-white">Join as Alumni</h1>
+            <p class="text-slate-400 mt-2 text-sm">Give back to your alma mater. Help students grow.</p>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="flex items-center gap-2 mb-8 px-4">
+            <div class="step-circle bg-indigo-600 text-white" id="s1circle">1</div>
+            <div class="step-line bg-slate-700" id="line1"></div>
+            <div class="step-circle bg-slate-700 text-slate-400" id="s2circle">2</div>
+            <div class="step-line bg-slate-700" id="line2"></div>
+            <div class="step-circle bg-slate-700 text-slate-400" id="s3circle">3</div>
+            <div class="flex-1"></div>
+            <div class="text-xs text-slate-500" id="stepLabel">Step 1 of 3</div>
+        </div>
+
+        <!-- Card -->
+        <div class="glass rounded-2xl p-8">
+            <div id="errBanner"
+                class="hidden mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm"></div>
+
+            <!-- STEP 1: Credentials -->
+            <div class="slide active" id="step1">
+                <h2 class="text-lg font-bold text-white mb-1">Account Credentials</h2>
+                <p class="text-slate-400 text-sm mb-6">This will be your login to the alumni portal</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Full
+                            Name</label>
+                        <input id="name" required placeholder="Rahul Kumar"
+                            class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Email
+                            Address</label>
+                        <input id="email" type="email" required placeholder="rahul@google.com"
+                            class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                        <label
+                            class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Password</label>
+                        <input id="password" type="password" required placeholder="Min 8 characters"
+                            class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: Academic + Professional -->
+            <div class="slide" id="step2">
+                <h2 class="text-lg font-bold text-white mb-1">Your Background</h2>
+                <p class="text-slate-400 text-sm mb-6">Tell students where you went and where you are now</p>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Branch
+                                / Dept</label>
+                            <input id="branch" required placeholder="Computer Science"
+                                class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Graduation
+                                Year</label>
+                            <input id="graduation_year" type="number" required placeholder="2022" min="1990" max="2030"
+                                class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Current
+                                Company</label>
+                            <input id="current_company" required placeholder="Google"
+                                class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Job
+                                Title</label>
+                            <input id="job_title" required placeholder="Senior SDE"
+                                class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 3: Profile links + preferences -->
+            <div class="slide" id="step3">
+                <h2 class="text-lg font-bold text-white mb-1">Final Details</h2>
+                <p class="text-slate-400 text-sm mb-6">Help students verify your identity and find you</p>
+                <div class="space-y-4">
+                    <div>
+                        <label
+                            class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">LinkedIn
+                            URL (used for verification)</label>
+                        <input id="linkedin_url" type="url" placeholder="https://linkedin.com/in/yourprofile"
+                            class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm" />
+                    </div>
+                    <div class="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p class="text-xs text-slate-400 leading-relaxed">After submitting, our TPO team will review
+                                your profile (1-2 business days). You'll get a notification once verified. Then you'll
+                                have full access to post jobs & offer mentorship.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex gap-3 mt-8">
+                <button id="backBtn" onclick="prevStep()"
+                    class="hidden flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 rounded-xl text-sm transition-colors">←
+                    Back</button>
+                <button id="nextBtn" onclick="nextStep()"
+                    class="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl text-sm transition-all">
+                    Next →
+                </button>
+            </div>
+        </div>
+
+        <p class="text-center text-slate-500 text-sm mt-5">
+            Already have an account? <a href="/alumni/login"
+                class="text-indigo-400 hover:text-indigo-300 font-semibold">Sign In</a>
+        </p>
+    </div>
+
+    <script>
+        let currentStep = 1;
+
+        function updateUI() {
+            document.querySelectorAll('.slide').forEach((el, i) => {
+                el.classList.toggle('active', i + 1 === currentStep);
+            });
+            const circles = ['s1circle', 's2circle', 's3circle'];
+            circles.forEach((id, i) => {
+                const el = document.getElementById(id);
+                if (i + 1 < currentStep) {
+                    el.style.background = '#10b981'; el.style.color = 'white';
+                    el.innerHTML = '✓';
+                } else if (i + 1 === currentStep) {
+                    el.style.background = '#6366f1'; el.style.color = 'white';
+                    el.textContent = i + 1;
+                } else {
+                    el.style.background = '#334155'; el.style.color = '#94a3b8';
+                    el.textContent = i + 1;
+                }
+            });
+            const lines = ['line1', 'line2'];
+            lines.forEach((id, i) => {
+                document.getElementById(id).style.background = i + 1 < currentStep ? '#6366f1' : '#334155';
+            });
+            document.getElementById('stepLabel').textContent = `Step ${currentStep} of 3`;
+            document.getElementById('backBtn').classList.toggle('hidden', currentStep === 1);
+            document.getElementById('nextBtn').textContent = currentStep === 3 ? 'Submit Registration →' : 'Next →';
+        }
+
+        function nextStep() {
+            if (currentStep === 1) {
+                if (!document.getElementById('name').value || !document.getElementById('email').value || !document.getElementById('password').value) {
+                    showError('Please fill in all fields in this step'); return;
+                }
+                if (document.getElementById('password').value.length < 6) {
+                    showError('Password must be at least 6 characters'); return;
+                }
+            }
+            if (currentStep === 2) {
+                if (!document.getElementById('branch').value || !document.getElementById('graduation_year').value ||
+                    !document.getElementById('current_company').value || !document.getElementById('job_title').value) {
+                    showError('Please fill in all fields in this step'); return;
+                }
+            }
+            if (currentStep < 3) {
+                currentStep++;
+                clearError();
+                updateUI();
+            } else {
+                submitRegistration();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) { currentStep--; clearError(); updateUI(); }
+        }
+
+        function showError(msg) {
+            const b = document.getElementById('errBanner');
+            b.textContent = msg;
+            b.classList.remove('hidden');
+        }
+        function clearError() {
+            document.getElementById('errBanner').classList.add('hidden');
+        }
+
+        async function submitRegistration() {
+            const btn = document.getElementById('nextBtn');
+            btn.textContent = 'Submitting…';
+            btn.disabled = true;
+
+            const body = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                branch: document.getElementById('branch').value,
+                graduation_year: parseInt(document.getElementById('graduation_year').value),
+                current_company: document.getElementById('current_company').value,
+                job_title: document.getElementById('job_title').value,
+                linkedin_url: document.getElementById('linkedin_url').value || '',
+            };
+
+            const res = await fetch('/alumni/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            if (res.ok) {
+                window.location.href = '/alumni/verification';
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showError(err.detail || 'Registration failed. Please try again.');
+                btn.textContent = 'Submit Registration →';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>

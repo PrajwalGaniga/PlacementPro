@@ -2,8 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.database import connect_db, close_db
-from app.routes import tpo, drive, student,scheduler,top_resume
+from app.routes import tpo, drive, student, scheduler, top_resume, bot
 import os
+from app.routes import admin_applications
+from app.routes.alumni import router as alumni_router, admin_alumni, student_alumni_router
+
 
 app = FastAPI(
     title="PlacementPro AI",
@@ -41,6 +44,14 @@ app.include_router(drive.router)
 app.include_router(student.router)
 app.include_router(scheduler.router)
 app.include_router(top_resume.router)
+app.include_router(admin_applications.router)
+# Alumni Connect Portal routers (additive)
+app.include_router(alumni_router)           # /alumni/*
+app.include_router(admin_alumni)            # /admin/alumni/*
+app.include_router(student_alumni_router)   # /student/alumni-jobs, /student/alumni-sessions, etc.
+# PlacementBot V2 – Hybrid AI Career Analyzer
+app.include_router(bot.router)              # /bot/chat
+
 
 @app.get("/")
 async def root():
@@ -50,3 +61,8 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# NEW: Serve submitted resumes
+SUBMITTED_DIR = os.path.join(os.path.dirname(__file__), "..", "submitted_resumes")
+os.makedirs(SUBMITTED_DIR, exist_ok=True)
+app.mount("/submitted_resumes", StaticFiles(directory=SUBMITTED_DIR), name="submitted_resumes")

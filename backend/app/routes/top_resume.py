@@ -5,8 +5,14 @@ from app.database import get_db
 from app.utils.auth import get_current_user
 from docxtpl import DocxTemplate
 from docx2pdf import convert
+from datetime import datetime
+from app.utils.student_auth import get_current_student
 from xhtml2pdf import pisa
 import google.generativeai as genai
+from pydantic import BaseModel
+
+class GenerateRequest(BaseModel):
+    template_id: str
 
 router = APIRouter(prefix="/resume", tags=["Resume Builder"])
 
@@ -210,5 +216,81 @@ async def delete_template(tid: str, user: dict = Depends(get_current_user)):
         db = get_db()
         await db["resume_templates"].delete_one({"_id": tid, "college_id": user["college_id"]})
         return {"message": "Template deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/generate")
+async def generate_student_resume(req: GenerateRequest, current_student: dict = Depends(get_current_student)):
+    """Generates a PDF resume using a template and saves it to the student's profile."""
+    try:
+        db = get_db()
+        usn = current_student.get("usn")
+        
+        # 1. Fetch Student Data & Template
+        student_data = await db["students"].find_one({"usn": usn}, {"_id": 0})
+        template = await db["resume_templates"].find_one({"_id": req.template_id})
+        
+        if not student_data: raise HTTPException(status_code=404, detail="Student profile not found")
+        if not template: raise HTTPException(status_code=404, detail="Template not found")
+
+        # Fallback for missing arrays to prevent Jinja2 crashes
+        for key in ["skills", "experience", "projects", "education"]:
+            if key not in student_data or not student_data[key]:
+                student_data[key] = []
+
+        output_filename = f"resume_{usn}_{uuid.uuid4().hex[:6]}.pdf"
+        output_pdf_path = os.path.join(PUBLIC_DIR, output_filename)
+        public_url = f"{BASE_URL}/{output_filename}"
+
+        # 2. Render HTML Template
+        if template["type"] == "html":
+            with open(template["raw_path"], "r", encoding="utf-8") as f:
+                html_content = f.read()
+            
+            jinja_template = jinja2.Template(html_content)
+            rendered_html = jinja_template.render(student_data)
+            
+            with open(output_pdf_path, "w+b") as result_file:
+                pisa_status = pisa.CreatePDF(rendered_html, dest=result_file)
+            if pisa_status.err: raise Exception("PDF creation failed using xhtml2pdf!")
+
+        # 3. Render DOCX Template
+        elif template["type"] == "docx":
+            temp_docx = os.path.join(PUBLIC_DIR, f"temp_{usn}.docx")
+            doc = DocxTemplate(template["raw_path"])
+            doc.render(student_data)
+            doc.save(temp_docx)
+            
+            import pythoncom
+            pythoncom.CoInitialize()
+            convert(temp_docx, output_pdf_path)
+            os.remove(temp_docx)
+
+        # 4. Save to Database
+        resume_record = {
+            "template_name": template["name"],
+            "pdf_url": public_url,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+        await db["students"].update_one(
+            {"usn": usn},
+            {"$push": {"saved_resumes": resume_record}}
+        )
+
+        return {"message": "Resume generated successfully", "resume": resume_record}
+        
+    except Exception as e:
+        print("\n🚨 RESUME GENERATION ERROR:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate resume: {str(e)}")
+    
+@router.get("/my-resumes")
+async def get_my_resumes(current_student: dict = Depends(get_current_student)):
+    """Fetches all generated resumes for the logged-in student."""
+    try:
+        db = get_db()
+        student = await db["students"].find_one({"usn": current_student.get("usn")}, {"saved_resumes": 1})
+        return student.get("saved_resumes", []) if student else []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

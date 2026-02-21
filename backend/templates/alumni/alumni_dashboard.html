@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Alumni Dashboard | PlacementPro AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <style>
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            background: #0f172a;
+            font-family: 'Inter', system-ui, sans-serif;
+            margin: 0
+        }
+
+        .sidebar {
+            background: rgba(15, 23, 42, .97);
+            border-right: 1px solid rgba(255, 255, 255, .06)
+        }
+
+        .nav-item {
+            border-radius: 10px;
+            transition: all .15s;
+            cursor: pointer
+        }
+
+        .nav-item:hover {
+            background: rgba(99, 102, 241, .1)
+        }
+
+        .nav-item.active {
+            background: rgba(99, 102, 241, .15);
+            color: #818cf8
+        }
+
+        .card {
+            background: rgba(30, 41, 59, .8);
+            border: 1px solid rgba(255, 255, 255, .07);
+            border-radius: 16px
+        }
+
+        .section {
+            display: none
+        }
+
+        .section.active {
+            display: block
+        }
+
+        input,
+        textarea,
+        select {
+            transition: border-color .2s
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, .15)
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .65);
+            z-index: 50;
+            align-items: center;
+            justify-content: center
+        }
+
+        .modal-overlay.open {
+            display: flex
+        }
+
+        .badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 999px;
+            display: inline-block
+        }
+
+        .tag-pill {
+            background: rgba(99, 102, 241, .12);
+            border: 1px solid rgba(99, 102, 241, .25);
+            color: #818cf8;
+            font-size: 11px;
+            padding: 2px 9px;
+            border-radius: 6px;
+            font-weight: 600
+        }
+
+        .star-btn {
+            font-size: 22px;
+            cursor: pointer;
+            transition: transform .1s;
+            color: #334155
+        }
+
+        .star-btn.lit,
+        .star-btn:hover {
+            color: #f59e0b;
+            transform: scale(1.2)
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .animate-in {
+            animation: slideUp .25s ease-out
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex">
+
+    <!-- ══════════════ SIDEBAR ══════════════ -->
+    <aside class="sidebar w-56 flex-shrink-0 flex flex-col h-screen sticky top-0 overflow-y-auto">
+        <div class="p-4 border-b border-white/5">
+            <div class="flex items-center gap-2">
+                <div
+                    class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 14l9-5-9-5-9 5 9 5z" />
+                    </svg>
+                </div>
+                <span class="text-white font-bold text-sm">PlacementPro</span>
+            </div>
+        </div>
+        <!-- Profile chip -->
+        <div class="px-3 mt-3">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-xl"
+                style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.15)">
+                <div
+                    class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {{ alumni.name[0].upper() }}</div>
+                <div class="min-w-0">
+                    <div class="text-white text-xs font-semibold truncate">{{ alumni.name }}</div>
+                    <div class="text-slate-500 text-xs truncate">{{ alumni.job_title }}</div>
+                </div>
+            </div>
+        </div>
+        <!-- Nav -->
+        <nav class="flex-1 px-2 mt-3 space-y-0.5">
+            <div class="nav-item active flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300"
+                onclick="show('feed')" id="nav-feed">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                </svg>
+                Job Feed
+            </div>
+            <div class="nav-item flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300"
+                onclick="show('post-job')" id="nav-post-job">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Post a Job
+            </div>
+            <div class="nav-item flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300"
+                onclick="show('sessions')" id="nav-sessions">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                My Sessions
+            </div>
+            <div class="nav-item flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300"
+                onclick="show('applicants')" id="nav-applicants">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Applicant Manager
+                {% if applicants %}<span
+                    class="ml-auto text-xs font-bold bg-indigo-500 text-white rounded-full px-1.5">{{ applicants|length
+                    }}</span>{% endif %}
+            </div>
+            <a href="/alumni/profile" class="nav-item flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                My Profile
+            </a>
+        </nav>
+        <div class="p-2 mt-auto border-t border-white/5">
+            <form method="post" action="/alumni/logout">
+                <button
+                    class="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-500 hover:text-red-400 rounded-xl hover:bg-red-500/5 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign Out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- ══════════════ MAIN ══════════════ -->
+    <main class="flex-1 overflow-y-auto">
+        <!-- Top bar -->
+        <div class="sticky top-0 z-10 px-6 py-3 flex items-center justify-between"
+            style="background:rgba(15,23,42,.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.05)">
+            <h1 class="text-white font-bold" id="pageTitle">Job Feed</h1>
+            <span
+                class="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full"><span
+                    class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Verified · {{ alumni.current_company
+                }}</span>
+        </div>
+
+        <div class="p-5 max-w-3xl mx-auto">
+
+            <!-- ─── FEED ─── -->
+            <div class="section active animate-in" id="section-feed">
+                <!-- Quick compose -->
+                <div class="card p-3.5 mb-4 cursor-pointer hover:border-indigo-500/30 transition-colors"
+                    onclick="show('post-job')"
+                    style="background:rgba(99,102,241,.04);border-color:rgba(99,102,241,.15)">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                            {{ alumni.name[0].upper() }}</div>
+                        <div
+                            class="flex-1 bg-slate-800/50 rounded-xl px-4 py-2 text-slate-500 text-sm border border-slate-700/50">
+                            Share a referral job opportunity…</div>
+                        <button class="bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-lg">+
+                            Post</button>
+                    </div>
+                </div>
+                <!-- Job cards -->
+                {% if not all_jobs %}<div class="text-center py-20">
+                    <div class="text-5xl mb-3">📭</div>
+                    <p class="text-slate-500 text-sm">No jobs yet. Be the first to post a referral!</p>
+                </div>
+                {% else %}
+                {% for j in all_jobs %}
+                <div class="card p-4 mb-3 animate-in" id="jc-{{ j._id }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+                                {{ j.company_name[0].upper() if j.company_name else '?' }}</div>
+                            <div>
+                                <div class="text-white font-bold text-sm">{{ j.company_name }}</div>
+                                <div class="text-slate-400 text-xs">{{ j.role }}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {% if j.is_mine %}<span class="tag-pill">My Post</span><button
+                                onclick="delJob('{{ j._id }}')"
+                                class="text-slate-600 hover:text-red-400 transition-colors ml-1"><svg class="w-4 h-4"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg></button>{% endif %}
+                        </div>
+                    </div>
+                    <p class="text-slate-400 text-sm leading-relaxed mb-3">{{ j.description }}</p>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-600 text-xs">by {{ j.alumni_name }}</span>
+                        <a href="{{ j.apply_link_or_email if j.apply_link_or_email.startswith('http') else 'mailto:'+j.apply_link_or_email }}"
+                            target="_blank"
+                            class="bg-indigo-600/15 border border-indigo-500/25 text-indigo-400 hover:text-indigo-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">Apply
+                            →</a>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- ─── POST JOB ─── -->
+            <div class="section" id="section-post-job">
+                <div class="card p-5">
+                    <h2 class="text-white font-bold text-base mb-1">Post a Referral Job</h2>
+                    <p class="text-slate-400 text-xs mb-5">Students will click your apply link and apply externally.</p>
+                    <div id="jobErr"
+                        class="hidden mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                    </div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="label">Company</label><input id="jCo" placeholder="Google" class="inp" />
+                            </div>
+                            <div><label class="label">Role</label><input id="jRole" placeholder="SDE-2" class="inp" />
+                            </div>
+                        </div>
+                        <div><label class="label">Description</label><textarea id="jDesc" rows="3"
+                                placeholder="Role details, skills needed…" class="inp resize-none"></textarea></div>
+                        <div><label class="label">Apply Link or Email</label><input id="jLink"
+                                placeholder="https://... or hr@company.com" class="inp" /></div>
+                        <div class="flex gap-2 pt-1">
+                            <button onclick="show('feed')"
+                                class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">Cancel</button>
+                            <button onclick="postJob()"
+                                class="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-2.5 rounded-xl text-sm">Post
+                                Referral →</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MY SESSIONS ─── -->
+            <div class="section" id="section-sessions">
+                <!-- Create session form -->
+                <div class="card p-5 mb-4">
+                    <h2 class="text-white font-bold text-base mb-1">Create a Session Offering</h2>
+                    <p class="text-slate-400 text-xs mb-4">Students will apply and you'll schedule Date/Time + Zoom
+                        link.</p>
+                    <div id="sessErr"
+                        class="hidden mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                    </div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="label">Session Type</label>
+                                <select id="sType" class="inp">
+                                    <option>Mock Interview</option>
+                                    <option>Career Guidance</option>
+                                </select>
+                            </div>
+                            <div><label class="label">Mode</label>
+                                <select id="sPaid" class="inp" onchange="togglePrice()">
+                                    <option value="free">Free</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="priceRow" class="hidden"><label class="label">Price (₹)</label><input id="sPrice"
+                                type="number" min="0" placeholder="500" class="inp" /></div>
+                        <div><label class="label">Description</label><textarea id="sDesc" rows="3"
+                                placeholder="What will you cover? Expected outcome?" class="inp resize-none"></textarea>
+                        </div>
+                        <button onclick="createSession()"
+                            class="w-full bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-semibold py-2.5 rounded-xl text-sm">Create
+                            Session Offering →</button>
+                    </div>
+                </div>
+
+                <!-- Existing sessions list -->
+                <h3 class="text-white font-semibold text-sm mb-3">Your Active Offerings</h3>
+                {% if not my_sessions %}
+                <div class="text-center py-10 text-slate-600 text-sm">No sessions created yet.</div>
+                {% else %}
+                {% for s in my_sessions %}
+                <div class="card p-4 mb-3" id="sc-{{ s._id }}">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span
+                                    class="tag-pill {% if s.session_type == 'Mock Interview' %}{% else %}bg-cyan-500/10 border-cyan-500/25 text-cyan-400{% endif %}">{{
+                                    s.session_type }}</span>
+                                {% if s.is_paid %}<span
+                                    class="badge bg-amber-500/10 text-amber-400 border border-amber-500/25">₹{{ s.price
+                                    }}</span>
+                                {% else %}<span
+                                    class="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">Free</span>{%
+                                endif %}
+                                <span class="text-slate-500 text-xs">{{ s.applicant_count }} applicants</span>
+                            </div>
+                            <p class="text-slate-400 text-sm leading-relaxed">{{ s.description }}</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-2 ml-3 flex-shrink-0">
+                            <!-- Toggle -->
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none"
+                                title="{% if s.is_active %}Accepting applications{% else %}Paused{% endif %}">
+                                <span class="text-xs text-slate-500">{% if s.is_active %}Active{% else %}Paused{% endif
+                                    %}</span>
+                                <div class="toggle-track {% if s.is_active %}on{% endif %}" id="toggleTrack-{{ s._id }}"
+                                    onclick="toggleSession('{{ s._id }}', {{ 'true' if s.is_active else 'false' }})">
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </label>
+                            <button onclick="delSession('{{ s._id }}')"
+                                class="text-slate-600 hover:text-red-400 text-xs transition-colors">Delete</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- ─── APPLICANT MANAGER ─── -->
+            <div class="section" id="section-applicants">
+                <h2 class="text-white font-bold text-base mb-4">Applicant Manager</h2>
+                {% if not applicants %}
+                <div class="text-center py-16 text-slate-600 text-sm">No applications yet. Create a session and students
+                    will apply!</div>
+                {% else %}
+                {% for a in applicants %}
+                <div class="card p-4 mb-3" id="app-{{ a._id }}">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                {{ a.student_name[0].upper() if a.student_name else '?' }}</div>
+                            <div>
+                                <div class="text-white font-semibold text-sm">{{ a.student_name }}</div>
+                                <div class="text-slate-500 text-xs">{{ a.student_usn }}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="tag-pill">{{ a.session_type }}</span>
+                            <span
+                                class="badge {% if a.status=='Completed' %}bg-emerald-500/10 text-emerald-400 border-emerald-500/25{% elif a.status=='Scheduled' %}bg-indigo-500/10 text-indigo-400 border-indigo-500/25{% else %}bg-amber-500/10 text-amber-400 border-amber-500/25{% endif %} border">{{
+                                a.status }}</span>
+                        </div>
+                    </div>
+
+                    {% if a.status == 'Applied' %}
+                    <!-- Schedule form -->
+                    <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800">
+                        <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">Schedule Session
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="date" id="d-{{ a._id }}"
+                                class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs" />
+                            <input type="time" id="t-{{ a._id }}"
+                                class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs" />
+                        </div>
+                        <input type="url" id="l-{{ a._id }}" placeholder="Paste Zoom / Google Meet link"
+                            class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs mb-2" />
+                        <button onclick="scheduleApp('{{ a._id }}')"
+                            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-xs transition-colors">Schedule
+                            & Notify →</button>
+                    </div>
+
+                    {% elif a.status == 'Scheduled' %}
+                    <!-- Scheduled info + Complete -->
+                    <div class="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3 mb-2">
+                        <div class="flex items-center gap-2 text-xs text-indigo-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {{ a.scheduled_date }} at {{ a.scheduled_time }}
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1 truncate">{{ a.meeting_link }}</div>
+                    </div>
+                    <button onclick="openFeedback('{{ a._id }}')"
+                        class="w-full bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 font-semibold py-2 rounded-lg text-xs transition-colors">✓
+                        Mark Completed + Give Feedback</button>
+
+                    {% elif a.status == 'Completed' %}
+                    <!-- Feedback display -->
+                    <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+                        <div class="flex items-center gap-1 mb-1">
+                            {% for i in range(1,6) %}<span
+                                class="text-base {% if i <= a.alumni_rating %}text-amber-400{% else %}text-slate-700{% endif %}">★</span>{%
+                            endfor %}
+                            <span class="text-xs text-slate-500 ml-1">{{ a.alumni_rating }}/5</span>
+                        </div>
+                        <p class="text-slate-400 text-xs leading-relaxed">{{ a.alumni_remarks }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+        </div><!-- /content -->
+    </main>
+
+    <!-- ══════════════ FEEDBACK MODAL ══════════════ -->
+    <div class="modal-overlay" id="feedbackModal">
+        <div class="w-full max-w-md mx-4 rounded-2xl p-6"
+            style="background:#1e293b;border:1px solid rgba(255,255,255,.08)">
+            <h2 class="text-white font-bold text-base mb-1">Mark Session Completed</h2>
+            <p class="text-slate-400 text-xs mb-5">Give constructive feedback to help the student grow.</p>
+            <input type="hidden" id="fbAppId" />
+            <!-- Stars -->
+            <div class="mb-4">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Rating</label>
+                <div class="flex gap-1" id="starRow">
+                    <span class="star-btn" data-v="1" onclick="setStar(1)">★</span>
+                    <span class="star-btn" data-v="2" onclick="setStar(2)">★</span>
+                    <span class="star-btn" data-v="3" onclick="setStar(3)">★</span>
+                    <span class="star-btn" data-v="4" onclick="setStar(4)">★</span>
+                    <span class="star-btn" data-v="5" onclick="setStar(5)">★</span>
+                </div>
+            </div>
+            <!-- Remarks -->
+            <div class="mb-5">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Remarks /
+                    Feedback</label>
+                <textarea id="fbRemarks" rows="4"
+                    placeholder="e.g. Great problem-solving approach, needs to improve system design knowledge…"
+                    class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm resize-none"></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeFeedback()"
+                    class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl text-sm">Cancel</button>
+                <button onclick="submitFeedback()"
+                    class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-2.5 rounded-xl text-sm">Submit
+                    & Complete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toggle CSS (inline, minimal) -->
+    <style>
+        .toggle-track {
+            width: 40px;
+            height: 22px;
+            border-radius: 11px;
+            background: #334155;
+            transition: background .2s;
+            cursor: pointer;
+            position: relative;
+            display: inline-block
+        }
+
+        .toggle-track.on {
+            background: #6366f1
+        }
+
+        .toggle-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: left .2s
+        }
+
+        .toggle-track.on .toggle-thumb {
+            left: 21px
+        }
+
+        .label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: .05em
+        }
+
+        .inp {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px
+        }
+    </style>
+
+    <script>
+        // ─── Nav ────────────────────────────────────
+        const TITLES = { feed: 'Job Feed', 'post-job': 'Post a Job', sessions: 'My Sessions', applicants: 'Applicant Manager' };
+        function show(name) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const s = document.getElementById('section-' + name);
+            if (s) { s.classList.add('active'); s.classList.add('animate-in') }
+            const n = document.getElementById('nav-' + name);
+            if (n) n.classList.add('active');
+            document.getElementById('pageTitle').textContent = TITLES[name] || '';
+        }
+
+        function togglePrice() {
+            document.getElementById('priceRow').classList.toggle('hidden', document.getElementById('sPaid').value !== 'paid');
+        }
+
+        // ─── Jobs ────────────────────────────────────
+        async function postJob() {
+            const co = document.getElementById('jCo').value.trim();
+            const role = document.getElementById('jRole').value.trim();
+            const desc = document.getElementById('jDesc').value.trim();
+            const link = document.getElementById('jLink').value.trim();
+            if (!co || !role || !desc || !link) { return showErr('jobErr', 'Please fill all fields.') }
+            const r = await fetch('/alumni/jobs', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify({ company_name: co, role, description: desc, apply_link_or_email: link })
+            });
+            if (r.ok) location.reload(); else showErr('jobErr', (await r.json()).detail || 'Failed');
+        }
+
+        async function delJob(id) {
+            if (!confirm('Remove this job post?')) return;
+            const r = await fetch('/alumni/jobs/' + id, { method: 'DELETE', credentials: 'include' });
+            if (r.ok) document.getElementById('jc-' + id)?.remove();
+        }
+
+        // ─── Sessions ────────────────────────────────
+        async function createSession() {
+            const type = document.getElementById('sType').value;
+            const paid = document.getElementById('sPaid').value === 'paid';
+            const price = paid ? parseFloat(document.getElementById('sPrice').value || '0') : 0;
+            const desc = document.getElementById('sDesc').value.trim();
+            if (!desc) { return showErr('sessErr', 'Please add a description.') }
+            const r = await fetch('/alumni/sessions', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify({ session_type: type, description: desc, is_paid: paid, price })
+            });
+            if (r.ok) location.reload(); else showErr('sessErr', (await r.json()).detail || 'Failed');
+        }
+
+        async function toggleSession(id, curActive) {
+            const newState = !curActive;
+            await fetch('/alumni/sessions/' + id + '/toggle', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify({ is_active: newState })
+            });
+            const track = document.getElementById('toggleTrack-' + id);
+            if (track) { track.classList.toggle('on', newState) }
+        }
+
+        async function delSession(id) {
+            if (!confirm('Delete this session? All applications will also be removed.')) return;
+            const r = await fetch('/alumni/sessions/' + id, { method: 'DELETE', credentials: 'include' });
+            if (r.ok) document.getElementById('sc-' + id)?.remove();
+        }
+
+        // ─── Applicants ──────────────────────────────
+        async function scheduleApp(id) {
+            const date = document.getElementById('d-' + id).value;
+            const time = document.getElementById('t-' + id).value;
+            const link = document.getElementById('l-' + id).value.trim();
+            if (!date || !time) { alert('Please set date and time.'); return }
+            const r = await fetch('/alumni/applications/' + id + '/schedule', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify({ scheduled_date: date, scheduled_time: time, meeting_link: link })
+            });
+            if (r.ok) location.reload(); else alert((await r.json()).detail || 'Failed');
+        }
+
+        // ─── Feedback Modal ──────────────────────────
+        let _rating = 0;
+        function openFeedback(id) {
+            document.getElementById('fbAppId').value = id;
+            _rating = 0; setStar(0);
+            document.getElementById('fbRemarks').value = '';
+            document.getElementById('feedbackModal').classList.add('open');
+        }
+        function closeFeedback() { document.getElementById('feedbackModal').classList.remove('open') }
+        function setStar(v) {
+            _rating = v;
+            document.querySelectorAll('.star-btn').forEach(b => b.classList.toggle('lit', parseInt(b.dataset.v) <= v));
+        }
+        async function submitFeedback() {
+            const id = document.getElementById('fbAppId').value;
+            const remarks = document.getElementById('fbRemarks').value.trim();
+            if (!_rating) { alert('Please select a rating.'); return }
+            if (!remarks) { alert('Please enter feedback remarks.'); return }
+            const r = await fetch('/alumni/applications/' + id + '/complete', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify({ alumni_rating: _rating, alumni_remarks: remarks })
+            });
+            if (r.ok) { closeFeedback(); location.reload(); }
+            else alert((await r.json()).detail || 'Failed');
+        }
+
+        function showErr(id, msg) {
+            const el = document.getElementById(id);
+            el.textContent = msg; el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 5000);
+        }
+
+        // Close modal on bg click
+        document.getElementById('feedbackModal').addEventListener('click', function (e) {
+            if (e.target === this) closeFeedback();
+        });
+    </script>
+</body>
+
+</html>
