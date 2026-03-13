@@ -55,9 +55,12 @@ async def get_drive_applicants(drive_id: str):
                 "usn": app.get("usn", ""),
                 "name": s_info.get("name", "Unknown"),
                 "branch": s_info.get("branch", "N/A"),
-                "resume_url": app.get("resume_url", ""),
+                "resume_url": f"/resumes/{app.get('usn')}.pdf" if s_info.get("has_resume") else "",
                 "ats_score": ats_score,
-                "status": app.get("status", "Applied")
+                "status": app.get("status", "Applied"),
+                "matched_skills": app.get("matched_skills", []),
+                "missing_skills": app.get("missing_skills", []),
+                "ai_feedback": app.get("ai_feedback", "")
             })
             
         # Sort by ATS score highest to lowest

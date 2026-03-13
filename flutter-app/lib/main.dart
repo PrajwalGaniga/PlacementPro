@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'services/api_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
+import 'screens/selection_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,7 +71,11 @@ class PlacementProApp extends StatelessWidget {
           unselectedItemColor: Color(0xFF64748b),
         ),
       ),
-      home: const _AuthGate(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const _AuthGate(),
+        '/selection': (context) => const SelectionScreen(),
+      },
     );
   }
 }
@@ -117,6 +122,6 @@ class _AuthGateState extends State<_AuthGate> {
         ),
       );
     }
-    return _loggedIn ? const MainScreen() : const LoginScreen();
+    return _loggedIn ? const MainScreen() : const SelectionScreen();
   }
 }

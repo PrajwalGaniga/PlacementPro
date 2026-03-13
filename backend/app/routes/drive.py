@@ -6,7 +6,7 @@ from app.utils.auth import get_current_user
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import os, io, json, uuid, shutil
 import PyPDF2
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/drive", tags=["Drive"])
 # ── Gemini Setup ──────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ── Logo Storage ──────────────────────────────────────────────────────────────
 LOGO_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "drive-logos")
@@ -166,8 +166,10 @@ async def parse_with_gemini(jd_text: str) -> dict:
     prompt = JD_PROMPT.format(jd_text=jd_text[:5000])
     for model_name in FALLBACK_MODELS:
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
             raw = response.text.strip()
             # Strip markdown code fences
             if raw.startswith("```"):

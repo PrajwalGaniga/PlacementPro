@@ -18,6 +18,7 @@ class Student(BaseModel):
     attendance_pct: float = 75.0
     mock_score: float = 0.0
     certifications: list[str] = []
+    has_resume: bool = False
 
     @property
     def batch_label(self) -> str:
@@ -53,6 +54,11 @@ class StudentProfile(BaseModel):
     education: List[Education] = []
     soft_skills: List[str] = []
     awards: List[str] = []
+
+class StudentLogin(BaseModel):
+    usn: str
+    email: str
+    college_id: str
 
 # Update your main Student class to include this:
 # profile: StudentProfile = StudentProfile()

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 
 import database as db
@@ -48,6 +48,7 @@ async def send_notifications(body: BulkNotifyRequest, tpo: dict = Depends(requir
 async def notify_eligible_students(
     drive_id: str,
     background_tasks: BackgroundTasks,
+    test_mode: bool = Query(True, description="If true, only sends emails to developer test accounts"),
     tpo: dict = Depends(require_tpo),
 ):
     drive = await db.drives().find_one({"drive_id": drive_id, "college_id": tpo.get("college_id")})
@@ -77,13 +78,27 @@ async def notify_eligible_students(
             "is_read": False,
             "created_at": now,
         })
-        background_tasks.add_task(
-            send_drive_notification,
-            s.get("email", ""),
-            s.get("name", ""),
-            drive.get("company_name", ""),
-            drive.get("job_role", ""),
-        )
+        
+        email = s.get("email", "").lower()
+        allowed_test_emails = {
+            "prajwalganiga06@gmail.com",
+            "sanvi.s.shetty18@gmail.com",
+            "varshiniganiga35@gmail.com",
+            "ishwarya9448@gmail.com"
+        }
+        
+        should_send = True
+        if test_mode and email not in allowed_test_emails:
+            should_send = False
+            
+        if should_send:
+            background_tasks.add_task(
+                send_drive_notification,
+                s.get("email", ""),
+                s.get("name", ""),
+                drive.get("company_name", ""),
+                drive.get("job_role", ""),
+            )
 
     if docs:
         await db.notifications().insert_many(docs)

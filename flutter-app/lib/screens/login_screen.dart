@@ -3,71 +3,60 @@ import '../services/api_service.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String collegeId;
+  final String collegeName;
+
+  const LoginScreen({
+    super.key,
+    required this.collegeId,
+    required this.collegeName,
+  });
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
   final _usnCtrl = TextEditingController();
-  List<dynamic> _colleges = [];
-  String? _selectedCollege;
+  final _emailCtrl = TextEditingController();
   bool _isLoading = false;
-  bool _loadingColleges = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadColleges();
-  }
-
-  Future<void> _loadColleges() async {
-    debugPrint("\n[DEBUG-FLUTTER] 🟡 Starting _loadColleges()...");
-    try {
-      final c = await ApiService.getColleges();
-      debugPrint("[DEBUG-FLUTTER] 🟢 Successfully fetched ${c.length} colleges: $c");
-      
-      setState(() { 
-        _colleges = c; 
-        _loadingColleges = false; 
-      });
-    } catch (e) {
-      // THE CULPRIT: This was silently failing before!
-      debugPrint("[DEBUG-FLUTTER] ❌ ERROR fetching colleges: $e");
-      
-      setState(() => _loadingColleges = false);
-      
-      // Show the error on the screen so you don't have to guess
-      if (mounted) {
-        _snack('Failed to load colleges. Check terminal for error.');
-      }
-    }
-  }
 
   Future<void> _login() async {
-    if (_selectedCollege == null || _usnCtrl.text.trim().isEmpty) {
-      _snack('Please select a college and enter your USN');
+    final usn = _usnCtrl.text.trim().toUpperCase();
+    final email = _emailCtrl.text.trim();
+    if (usn.isEmpty || email.isEmpty) {
+      _snack('Please enter your USN and Email');
       return;
     }
     setState(() => _isLoading = true);
     try {
-      final res = await ApiService.studentLogin(
-          _usnCtrl.text.trim().toUpperCase(), _selectedCollege!);
+      final res = await ApiService.studentLogin(usn, email, widget.collegeId);
+
       final student = res['student'] as Map<String, dynamic>;
+
       await ApiService.saveCredentials(
-        res['access_token'], student['usn'], student['college_id'] ?? _selectedCollege!, student['name'] ?? '');
+        res['access_token'],
+        student['usn'],
+        student['college_id'] ?? widget.collegeId,
+        student['name'] ?? '',
+      );
       await ApiService.saveStudentJson(student);
 
       // Recalculate score on login
       try {
         final score = await ApiService.calculateScore();
         await ApiService.saveScore(
-          (score['placement_score'] as num).toDouble(), score['label'] ?? '');
+          (score['placement_score'] as num).toDouble(),
+          score['label'] ?? '',
+        );
       } catch (_) {}
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(context,
-          MaterialPageRoute(builder: (_) => const MainScreen()), (_) => false);
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainScreen()),
+          (_) => false,
+        );
       }
     } catch (e) {
       _snack(e.toString().replaceAll('Exception: ', ''));
@@ -82,6 +71,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      extendBodyBehindAppBar: true,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -102,51 +100,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     width: 60, height: 60,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: const Color(0xFF6366f1).withOpacity(0.4), blurRadius: 24, offset: const Offset(0, 8))],
+                       gradient: const LinearGradient(colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)]),
+                       borderRadius: BorderRadius.circular(16),
+                       boxShadow: [BoxShadow(color: const Color(0xFF6366f1).withOpacity(0.4), blurRadius: 24, offset: const Offset(0, 8))],
                     ),
                     child: const Icon(Icons.school_rounded, color: Colors.white, size: 30),
                   ),
                   const SizedBox(height: 24),
-                  const Text('PlacementPro AI',
-                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
+                  Text(widget.collegeName,
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 6),
-                  const Text('Student Portal – Login with your USN',
+                  const Text('Enter your credentials to continue',
                     style: TextStyle(color: Color(0xFF94a3b8), fontSize: 14)),
                   const SizedBox(height: 40),
-
-                  // College picker
-                  const Text('Institution',
-                    style: TextStyle(color: Color(0xFF94a3b8), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
-                  const SizedBox(height: 8),
-                  _loadingColleges
-                    ? _fieldSkeleton()
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1e293b),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedCollege,
-                            isExpanded: true,
-                            dropdownColor: const Color(0xFF1e293b),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            hint: const Text('Select your college',
-                              style: TextStyle(color: Color(0xFF64748b))),
-                            items: _colleges.map<DropdownMenuItem<String>>((c) =>
-                              DropdownMenuItem(
-                                value: c['college_id'] as String,
-                                child: Text(c['name'] as String,
-                                  style: const TextStyle(color: Colors.white, fontSize: 14)),
-                              )).toList(),
-                            onChanged: (v) => setState(() => _selectedCollege = v),
-                          ),
-                        ),
-                      ),
-                  const SizedBox(height: 20),
 
                   // USN
                   const Text('USN',
@@ -159,6 +125,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: const InputDecoration(
                       hintText: 'e.g. 4SN25CS001',
                       prefixIcon: Icon(Icons.badge_outlined, color: Color(0xFF64748b), size: 20),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Email
+                  const Text('EMAIL',
+                    style: TextStyle(color: Color(0xFF94a3b8), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _emailCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      hintText: 'student@college.edu',
+                      prefixIcon: Icon(Icons.email_outlined, color: Color(0xFF64748b), size: 20),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -194,11 +175,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  Widget _fieldSkeleton() => Container(
-    height: 52,
-    decoration: BoxDecoration(color: const Color(0xFF1e293b), borderRadius: BorderRadius.circular(12)),
-    child: const Center(child: SizedBox(width: 20, height: 20,
-      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366f1)))),
-  );
 }

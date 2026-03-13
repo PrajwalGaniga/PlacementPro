@@ -8,8 +8,12 @@ from docx2pdf import convert
 from datetime import datetime
 from app.utils.student_auth import get_current_student
 from xhtml2pdf import pisa
-import google.generativeai as genai
+from google import genai
 from pydantic import BaseModel
+
+# Initialize Gemini Client
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 class GenerateRequest(BaseModel):
     template_id: str
@@ -153,8 +157,11 @@ async def upload_ai_pdf(file: UploadFile = File(...), user: dict = Depends(get_c
         
         Return ONLY valid, raw HTML code. Do not use markdown wrappers.
         """
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        html_content = model.generate_content(prompt).text.strip()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        html_content = response.text.strip()
         if html_content.startswith("```html"):
             html_content = html_content[7:-3]
         

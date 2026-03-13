@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
 import '../services/api_service.dart';
 
 // ── Data models (safe factories) ─────────────────────────────────────────────
@@ -16,8 +18,10 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
+  bool _uploadingResume = false;
   double _score = 0;
   String _scoreLabel = '';
+  bool _hasResume = false;
 
   // Basic fields
   final _nameCtrl = TextEditingController();
@@ -78,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Safely cast education
         _education = (student['education'] as List<dynamic>? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _hasResume = student['has_resume'] == true;
         
         debugPrint("[PROFILE] 🟢 Profile loaded successfully!");
       }
@@ -87,10 +92,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {});
   }
 
+  Future<void> _pickResume() async {
+    setState(() => _uploadingResume = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final res = await ApiService.uploadResume(
+          result.files.single.bytes!,
+          result.files.single.name,
+        );
+        
+        // [SYNC FIX]: Atomically save the freshly updated student object from the backend
+        if (res['user'] != null) {
+          await ApiService.saveStudentJson(res['user']);
+        }
+        
+        setState(() => _hasResume = true);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(res['message'] ?? 'Resume uploaded!'),
+          backgroundColor: const Color(0xFF10b981),
+        ));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString()),
+        backgroundColor: const Color(0xFFf43f5e),
+      ));
+    } finally {
+      setState(() => _uploadingResume = false);
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Guard: do not call if already saving (prevents double-tap loop)
+    if (_saving) return;
     setState(() => _saving = true);
-    debugPrint("[PROFILE] 🟡 Saving profile to backend...");
 
     try {
       final payload = {
@@ -112,11 +154,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final newLabel = res['label'] ?? _scoreLabel;
       
       await ApiService.saveScore(newScore, newLabel);
-      await ApiService.saveStudentJson({...payload, 'placement_score': newScore});
+
+      // [SYNC FIX] Use the complete user object returned by backend if available
+      // This preserves has_resume and all other fields not in the form payload
+      if (res['user'] != null) {
+        await ApiService.saveStudentJson(Map<String, dynamic>.from(res['user']));
+      } else {
+        // Fallback: merge score into local payload without overwriting has_resume
+        final existing = await ApiService.getStudentJson() ?? {};
+        await ApiService.saveStudentJson({
+          ...existing,
+          ...payload,
+          'placement_score': newScore,
+          'score_label': newLabel,
+        });
+      }
       
       setState(() { _score = newScore; _scoreLabel = newLabel; });
-      debugPrint("[PROFILE] 🟢 Saved! New Score: $newScore");
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Profile saved! Score: ${newScore.toInt()}%'),
@@ -124,7 +178,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ));
       }
     } catch (e) {
-      debugPrint("[PROFILE] ❌ Error saving profile: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.toString().replaceAll('Exception: ', '')),
@@ -146,6 +199,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.w700)),
         backgroundColor: const Color(0xFF1e1b4b),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: const Color(0xFFf43f5e)),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1e293b),
+                  title: const Text('Logout', style: TextStyle(color: Colors.white)),
+                  content: const Text('Are you sure you want to logout?', style: TextStyle(color: const Color(0xFF94a3b8))),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Logout', style: const TextStyle(color: const Color(0xFFf43f5e)))),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await ApiService.clearAll();
+                if (mounted) {
+                  // We need to import selection_screen.dart or handle navigation via root
+                  // For now, let's assuming we can just pushAndRemoveUntil to a new SelectionScreen
+                  // But wait, I need to import it.
+                   Navigator.pushNamedAndRemoveUntil(context, '/selection', (route) => false);
+                }
+              }
+            },
+          ),
           TextButton.icon(
             onPressed: _saving ? null : _save,
             icon: _saving
@@ -166,7 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${_score.toInt()}%', style: TextStyle(color: _scoreColor(_score), fontWeight: FontWeight.w800, fontSize: 36)),
-                    Text(_scoreLabel.isEmpty ? '—' : _scoreLabel, style: const TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.w600)),
+                    Text(_scoreLabel.isEmpty ? '—' : _scoreLabel, style: const TextStyle(color: const Color(0xFF94a3b8), fontWeight: FontWeight.w600)),
                   ]),
                 ),
                 Expanded(child: LinearProgressIndicator(
@@ -176,6 +255,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             )),
             const SizedBox(height: 16),
+            
+            // Resume Section
+            _section('My Resume', icon: Icons.description_outlined, child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _hasResume ? const Color(0xFF10b981).withOpacity(0.1) : const Color(0xFFf43f5e).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _hasResume ? const Color(0xFF10b981).withOpacity(0.3) : const Color(0xFFf43f5e).withOpacity(0.3)),
+                      ),
+                      child: Row(children: [
+                        Icon(_hasResume ? Icons.check_circle_rounded : Icons.info_outline_rounded, 
+                          size: 16, color: _hasResume ? const Color(0xFF10b981) : const Color(0xFFf43f5e)),
+                        const SizedBox(width: 8),
+                        Text(_hasResume ? 'Resume Uploaded' : 'No Resume Uploaded',
+                          style: TextStyle(color: _hasResume ? const Color(0xFF10b981) : const Color(0xFFf43f5e), 
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                    const Spacer(),
+                    if (_uploadingResume)
+                      const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: const Color(0xFF6366f1)))
+                    else
+                      ElevatedButton.icon(
+                        onPressed: _pickResume,
+                        icon: const Icon(Icons.upload_file_rounded, size: 18),
+                        label: Text(_hasResume ? 'Change Resume' : 'Upload PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                  ],
+                ),
+                if (!_hasResume)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('Required to apply for placement drives.',
+                      style: const TextStyle(color: const Color(0xFFf43f5e), fontSize: 11, fontWeight: FontWeight.w500)),
+                  ),
+              ],
+            )),
+            const SizedBox(height: 16),
+
 
             // Basic Info
             _section('Basic Info', icon: Icons.person_outline_rounded, child: Column(children: [
@@ -198,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: _skills.asMap().entries.map((e) => Chip(
                     label: Text(e.value),
                     backgroundColor: const Color(0xFF6366f1).withOpacity(0.2),
-                    labelStyle: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.w600, fontSize: 12),
+                    labelStyle: const TextStyle(color: const Color(0xFF6366f1), fontWeight: FontWeight.w600, fontSize: 12),
                     deleteIcon: const Icon(Icons.close, size: 14, color: Color(0xFF6366f1)),
                     onDeleted: () => setState(() => _skills.removeAt(e.key)),
                   )).toList(),
@@ -269,9 +398,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       controller: ctrl, keyboardType: type, maxLines: maxLines, style: const TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label, hintText: hint,
-        labelStyle: const TextStyle(color: Color(0xFF94a3b8)), hintStyle: const TextStyle(color: Color(0xFF475569)),
+        labelStyle: const TextStyle(color: const Color(0xFF94a3b8)), hintStyle: const TextStyle(color: const Color(0xFF475569)),
         enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF6366f1))),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: const Color(0xFF6366f1))),
       ),
     ),
   );
@@ -283,7 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
         controller: ctrl, style: const TextStyle(color: Colors.white, fontSize: 13),
-        decoration: InputDecoration(labelText: label, hintText: hint, isDense: true, labelStyle: const TextStyle(color: Color(0xFF94a3b8), fontSize: 12)),
+        decoration: InputDecoration(labelText: label, hintText: hint, isDense: true, labelStyle: const TextStyle(color: const Color(0xFF94a3b8), fontSize: 12)),
         onChanged: (v) => map[key] = v,
       ),
     );
@@ -301,19 +430,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xFF0f172a), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF6366f1).withOpacity(0.3))),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0f172a), 
+        borderRadius: BorderRadius.circular(12), 
+        border: Border.all(color: const Color(0xFF6366f1).withOpacity(0.3))
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text('Experience ${idx + 1}', style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.w700))),
+          Expanded(child: Text('Experience ${idx + 1}', style: const TextStyle(color: const Color(0xFF6366f1), fontWeight: FontWeight.w700))),
           IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFf43f5e), size: 18), onPressed: () => setState(() => _experience.removeAt(idx))),
         ]),
         _fieldCtrl('Role', exp, 'role'), _fieldCtrl('Company', exp, 'company'), _fieldCtrl('Duration', exp, 'duration', hint: 'e.g. Jan 2024 – May 2024'),
         const SizedBox(height: 8),
-        const Text('Achievements', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 12, fontWeight: FontWeight.w600)),
+        const Text('Achievements', style: const TextStyle(color: const Color(0xFF94a3b8), fontSize: 12, fontWeight: FontWeight.w600)),
         ...achievements.asMap().entries.map((a) => Row(children: [
-          const Icon(Icons.arrow_right, color: Color(0xFF94a3b8), size: 16),
+          const Icon(Icons.arrow_right, color: const Color(0xFF94a3b8), size: 16),
           Expanded(child: Text(a.value, style: const TextStyle(color: Colors.white, fontSize: 13))),
-          IconButton(icon: const Icon(Icons.close, size: 14, color: Color(0xFFf43f5e)), onPressed: () => setState(() { achievements.removeAt(a.key); exp['achievements'] = achievements; })),
+          IconButton(icon: const Icon(Icons.close, size: 14, color: const Color(0xFFf43f5e)), onPressed: () => setState(() { achievements.removeAt(a.key); exp['achievements'] = achievements; })),
         ])),
         Row(children: [
           Expanded(child: TextField(controller: achievCtrl, style: const TextStyle(color: Colors.white, fontSize: 13), decoration: const InputDecoration(hintText: 'Add achievement…', isDense: true))),
@@ -323,7 +456,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 setState(() { achievements.add(achievCtrl.text.trim()); exp['achievements'] = achievements; });
               }
             },
-            child: const Text('Add', style: TextStyle(color: Color(0xFF6366f1))),
+            child: const Text('Add', style: const TextStyle(color: Color(0xFF6366f1))),
           ),
         ]),
       ]),
@@ -336,19 +469,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xFF0f172a), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF22d3ee).withOpacity(0.3))),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0f172a), 
+        borderRadius: BorderRadius.circular(12), 
+        border: Border.all(color: const Color(0xFF22d3ee).withOpacity(0.3))
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text('Project ${idx + 1}', style: const TextStyle(color: Color(0xFF22d3ee), fontWeight: FontWeight.w700))),
-          IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFf43f5e), size: 18), onPressed: () => setState(() => _projects.removeAt(idx))),
+          Expanded(child: Text('Project ${idx + 1}', style: const TextStyle(color: const Color(0xFF22d3ee), fontWeight: FontWeight.w700))),
+          IconButton(icon: const Icon(Icons.delete_outline, color: const Color(0xFFf43f5e), size: 18), onPressed: () => setState(() => _projects.removeAt(idx))),
         ]),
         _fieldCtrl('Project Name', proj, 'name'),
         const SizedBox(height: 8),
-        const Text('Description Points', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 12, fontWeight: FontWeight.w600)),
+        const Text('Description Points', style: const TextStyle(color: const Color(0xFF94a3b8), fontSize: 12, fontWeight: FontWeight.w600)),
         ...description.asMap().entries.map((d) => Row(children: [
-          const Icon(Icons.fiber_manual_record, color: Color(0xFF94a3b8), size: 8), const SizedBox(width: 8),
+          const Icon(Icons.fiber_manual_record, color: const Color(0xFF94a3b8), size: 8), const SizedBox(width: 8),
           Expanded(child: Text(d.value, style: const TextStyle(color: Colors.white, fontSize: 13))),
-          IconButton(icon: const Icon(Icons.close, size: 14, color: Color(0xFFf43f5e)), onPressed: () => setState(() { description.removeAt(d.key); proj['description'] = description; })),
+          IconButton(icon: const Icon(Icons.close, size: 14, color: const Color(0xFFf43f5e)), onPressed: () => setState(() { description.removeAt(d.key); proj['description'] = description; })),
         ])),
         Row(children: [
           Expanded(child: TextField(controller: descCtrl, style: const TextStyle(color: Colors.white, fontSize: 13), decoration: const InputDecoration(hintText: 'Add description point…', isDense: true))),
@@ -358,7 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 setState(() { description.add(descCtrl.text.trim()); proj['description'] = description; });
               }
             },
-            child: const Text('Add', style: TextStyle(color: Color(0xFF22d3ee))),
+            child: const Text('Add', style: const TextStyle(color: Color(0xFF22d3ee))),
           ),
         ]),
       ]),
@@ -367,11 +504,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _eduCard(int idx, Map<String, dynamic> edu) => Container(
     margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: const Color(0xFF0f172a), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFf59e0b).withOpacity(0.3))),
+    decoration: BoxDecoration(
+      color: const Color(0xFF0f172a), 
+      borderRadius: BorderRadius.circular(12), 
+      border: Border.all(color: const Color(0xFFf59e0b).withOpacity(0.3))
+    ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Expanded(child: Text('Education ${idx + 1}', style: const TextStyle(color: Color(0xFFf59e0b), fontWeight: FontWeight.w700))),
-        IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFf43f5e), size: 18), onPressed: () => setState(() => _education.removeAt(idx))),
+        Expanded(child: Text('Education ${idx + 1}', style: const TextStyle(color: const Color(0xFFf59e0b), fontWeight: FontWeight.w700))),
+        IconButton(icon: const Icon(Icons.delete_outline, color: const Color(0xFFf43f5e), size: 18), onPressed: () => setState(() => _education.removeAt(idx))),
       ]),
       _fieldCtrl('Degree', edu, 'degree', hint: 'B.E. Computer Science'), _fieldCtrl('Institution', edu, 'institution'),
       _fieldCtrl('Score', edu, 'score', hint: '8.5 CGPA / 85%'), _fieldCtrl('Years', edu, 'years', hint: '2021 – 2025'),

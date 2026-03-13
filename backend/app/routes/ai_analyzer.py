@@ -12,7 +12,7 @@ import re
 import os
 
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 from bson import ObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -25,8 +25,9 @@ router = APIRouter(prefix="/tpo", tags=["AI Analyzer"])
 # ──────────────────────────────────────────────────────────────
 # Gemini setup  (uses GEMINI_API_KEY from .env)
 # ──────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
 _GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
-genai.configure(api_key=_GEMINI_KEY)
+_client = genai.Client(api_key=_GEMINI_KEY)
 _AI_MODEL = "gemini-2.5-flash"
 
 
@@ -154,8 +155,10 @@ Return STRICTLY valid JSON — NO markdown fences, no explanation — using EXAC
   "action_plan":    ["step 1", "step 2", "step 3"]
 }}
 """
-        model = genai.GenerativeModel(_AI_MODEL)
-        resp = model.generate_content(prompt)
+        resp = _client.models.generate_content(
+            model=_AI_MODEL,
+            contents=prompt
+        )
         clean = re.sub(r"^```[a-z]*\n?|\n?```$", "", resp.text.strip(), flags=re.MULTILINE).strip()
         return json.loads(clean)
 

@@ -31,6 +31,11 @@ def _strip(doc: dict) -> dict:
     doc.pop("password_hash", None)
     return doc
 
+# ── Convenience Login (Alias for Flutter) ──────────────────────────────────────
+from .auth import student_login, StudentLoginRequest
+@router.post("/login")
+async def student_login_alias(body: StudentLoginRequest):
+    return await student_login(body)
 
 # ── Colleges (public, no auth) ─────────────────────────────────────────────────
 @router.get("/colleges")
@@ -45,7 +50,12 @@ async def get_profile(student: dict = Depends(get_current_student)):
     doc = await db.students().find_one({"usn": student["usn"]})
     if not doc:
         raise HTTPException(status_code=404, detail="Student not found")
-    return {"student": _strip(doc)}
+    
+    student_data = _strip(doc)
+    # Add computed has_resume flag directly into profile
+    student_data["has_resume"] = bool(student_data.get("resume_url"))
+    
+    return {"student": student_data}
 
 
 @router.put("/profile/update")
@@ -155,36 +165,38 @@ async def my_eligible_drives(student_jwt: dict = Depends(get_current_student)):
         s_cgpa = student.get("cgpa")
         s_backlogs = student.get("backlogs")
         s_branch = student.get("branch", "")
-        s_skills = set(student.get("skills", []))
+        s_skills = set(s.lower() for s in student.get("skills", []))
 
         # CGPA check
         min_cgpa = drive.get("min_cgpa") or 0
         if min_cgpa > 0:
             if s_cgpa is None:
                 reasons.append(f"CGPA not set (Required: {min_cgpa})")
-            elif s_cgpa < min_cgpa:
-                reasons.append(f"CGPA {s_cgpa} is below minimum {min_cgpa}")
+            elif float(s_cgpa) < float(min_cgpa):
+                reasons.append(f"Minimum CGPA {min_cgpa} required (Yours: {s_cgpa})")
 
         # Backlogs check
         max_backlogs = drive.get("max_backlogs")
-        if max_backlogs is not None:
+        if max_backlogs is not None and int(max_backlogs) < 10:
             if s_backlogs is None:
                 reasons.append(f"Backlogs not set (Max allowed: {max_backlogs})")
-            elif s_backlogs > max_backlogs:
-                reasons.append(f"You have {s_backlogs} backlog(s) (max allowed: {max_backlogs})")
+            elif int(s_backlogs) > int(max_backlogs):
+                reasons.append(f"Too many backlogs: {s_backlogs} (Max allowed: {max_backlogs})")
 
         # Branch check
         eligible_branches = drive.get("eligible_branches", [])
         if eligible_branches and s_branch not in eligible_branches:
-            reasons.append(f"Branch '{s_branch}' not eligible (Required: {', '.join(eligible_branches)})")
+            reasons.append(f"Branch '{s_branch}' not in eligible list: {', '.join(eligible_branches)}")
 
-        # Skills check
+        # Skills check – one entry per missing skill (up to 3)
         required_skills = drive.get("required_skills", [])
         if required_skills:
-            required_set = set(required_skills)
-            missing = required_set - s_skills
-            if missing:
-                reasons.append(f"Missing required skills: {', '.join(list(missing)[:3])}")
+            required_lower = set(s.lower() for s in required_skills)
+            missing = required_lower - s_skills
+            for skill in list(missing)[:3]:
+                reasons.append(f"Missing required skill: {skill.title()}")
+
+        is_locked = len(reasons) > 0
 
         drive_data = {
             "drive_id": drive.get("drive_id"),
@@ -193,6 +205,7 @@ async def my_eligible_drives(student_jwt: dict = Depends(get_current_student)):
             "job_role": drive.get("job_role"),
             "package_ctc": drive.get("package_ctc"),
             "work_location": drive.get("work_location"),
+            "job_description": drive.get("job_description", ""),
             "min_cgpa": drive.get("min_cgpa"),
             "max_backlogs": drive.get("max_backlogs"),
             "eligible_branches": drive.get("eligible_branches"),
@@ -200,16 +213,19 @@ async def my_eligible_drives(student_jwt: dict = Depends(get_current_student)):
             "application_deadline": drive.get("application_deadline"),
             "drive_date_time": drive.get("drive_date_time"),
             "applicant_count": drive.get("applicant_count", 0),
+            "eligible_count": drive.get("eligible_count", 0),
             "total_seats": drive.get("total_seats"),
             "logo_path": drive.get("logo_path"),
             "industry_category": drive.get("industry_category"),
-            "eligible": len(reasons) == 0,
-            "lock_reason": " | ".join(reasons) if reasons else None,
+            "is_locked": is_locked,
+            "lock_reason": reasons,
             "already_applied": drive.get("drive_id") in applied_drive_ids,
         }
         result.append(drive_data)
 
-    return {"eligible_drives": result, "total": len(result)}
+    has_resume = bool(student.get("resume_url"))
+    return {"drives": result, "total": len(result), "has_resume": has_resume}
+
 
 
 # ── Apply to drive ─────────────────────────────────────────────────────────────

@@ -1,5 +1,89 @@
-# Ignore environment files
-backend/.env
+# ════════════════════════════════════════════════════════════════════════
+#   PlacementPro — Root .gitignore
+# ════════════════════════════════════════════════════════════════════════
+
+# ── Environment & Secrets ───────────────────────────────────────────────
 .env
-venv/
+*.env
+.env.*
+backend/.env
+
+# ── Python ──────────────────────────────────────────────────────────────
 __pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+*.whl
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# ── ML Models & Large Binaries ──────────────────────────────────────────
+backend/ml_model/*.pkl
+backend/ml_model/*.joblib
+
+# ── Uploaded Files (resumes, logos, profiles) ───────────────────────────
+backend/uploads/
+backend/static/resumes/
+backend/drive-logos/
+backend/student-profiles/
+
+# ── Node / React Frontend ────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.cache/
+frontend/.parcel-cache/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Flutter / Dart ───────────────────────────────────────────────────────
+flutter-app/.dart_tool/
+flutter-app/.packages
+flutter-app/.pub-cache/
+flutter-app/.pub/
+flutter-app/build/
+flutter-app/android/.gradle/
+flutter-app/android/local.properties
+flutter-app/android/key.properties
+flutter-app/*.jks
+*.apk
+*.aab
+*.ipa
+flutter-app/ios/Pods/
+flutter-app/ios/.symlinks/
+flutter-app/ios/Flutter/Flutter.framework
+flutter-app/ios/Flutter/Flutter.podspec
+
+# ── IDE & OS ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Temp / Lock files ────────────────────────────────────────────────────
+~$*
+*.tmp
+*.bak
+*.swp
+*.swo

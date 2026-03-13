@@ -66,7 +66,7 @@ async def root():
 async def health():
     return {"status": "ok"}
 
-# NEW: Serve submitted resumes
-SUBMITTED_DIR = os.path.join(os.path.dirname(__file__), "..", "submitted_resumes")
-os.makedirs(SUBMITTED_DIR, exist_ok=True)
-app.mount("/submitted_resumes", StaticFiles(directory=SUBMITTED_DIR), name="submitted_resumes")
+# NEW: Serve student resumes
+RESUME_STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "resumes")
+os.makedirs(RESUME_STATIC_DIR, exist_ok=True)
+app.mount("/resumes", StaticFiles(directory=RESUME_STATIC_DIR), name="resumes")

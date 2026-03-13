@@ -126,16 +126,22 @@ class ApiService {
     throw Exception('Failed to calculate ATS match');
   }
 
-  // ── Login ──────────────────────────────────────────────────────────
+  // ── Login ────────────────────────────────────────────────────
+  // Endpoint: POST /student/login
+  // Backend schema: { usn, email, college_id }
   static Future<Map<String, dynamic>> studentLogin(
-      String usn, String collegeId) async {
+      String usn, String email, String collegeId) async {
     final res = await http.post(
       Uri.parse('$kBaseUrl/student/login'),
       headers: {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',
       },
-      body: jsonEncode({'usn': usn, 'college_id': collegeId}),
+      body: jsonEncode({
+        'usn': usn,
+        'email': email,
+        'college_id': collegeId,
+      }),
     );
     if (res.statusCode == 200) return jsonDecode(res.body);
     final err = jsonDecode(res.body);
@@ -143,6 +149,7 @@ class ApiService {
   }
 
   // ── Eligible Drives ────────────────────────────────────────────────
+  // Returns: { drives: [{is_locked, lock_reason[], already_applied, ...}], has_resume: bool }
   static Future<Map<String, dynamic>> getEligibleDrives() async {
     final res = await http.get(
       Uri.parse('$kBaseUrl/student/my-eligible-drives'),
@@ -150,6 +157,16 @@ class ApiService {
     );
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Failed to fetch drives');
+  }
+
+  // ── Student Profile (live fetch) ───────────────────────────────────
+  static Future<Map<String, dynamic>> getStudentProfile() async {
+    final res = await http.get(
+      Uri.parse('$kBaseUrl/student/profile'),
+      headers: await _headers(),
+    );
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to fetch profile');
   }
 
   // ── Calculate Score ────────────────────────────────────────────────
@@ -165,7 +182,8 @@ class ApiService {
     throw Exception('Score calculation failed');
   }
 
-  // ── Update Profile ─────────────────────────────────────────────────
+  // ── Update Profile ───────────────────────────────────────────
+  // Endpoint: PUT /student/update-profile
   static Future<Map<String, dynamic>> updateProfile(
       Map<String, dynamic> profile) async {
     final res = await http.put(
@@ -178,21 +196,46 @@ class ApiService {
     throw Exception(err['detail'] ?? 'Profile update failed');
   }
 
-  // ── Apply for Drive (Updated) ──────────────────────────────────────
-  static Future<Map<String, dynamic>> applyDrive(String driveId, {String? resumeUrl}) async {
-    final p = await SharedPreferences.getInstance();
+  // ── Apply for Drive ────────────────────────────────────────────────
+  // POST /student/apply — backend checks resume, eligibility, and triggers ATS
+  static Future<Map<String, dynamic>> applyDrive(String driveId) async {
     final res = await http.post(
       Uri.parse('$kBaseUrl/student/apply'),
       headers: await _headers(),
-      body: jsonEncode({
-        'drive_id': driveId, 
-        'college_id': p.getString('college_id') ?? '',
-        'resume_url': resumeUrl 
-      }),
+      body: jsonEncode({'drive_id': driveId}),
     );
     if (res.statusCode == 200) return jsonDecode(res.body);
-    throw Exception('Apply failed');
+    final err = jsonDecode(res.body);
+    throw Exception(err['detail'] ?? 'Apply failed');
   }
+
+  // ── Upload Resume ──────────────────────────────────────────────────
+  // Backend: POST /student/upload-resume  (saves to static/resumes/ by USN)
+  static Future<Map<String, dynamic>> uploadResume(List<int> bytes, String fileName) async {
+    final uri = Uri.parse('$kBaseUrl/student/upload-resume');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers());
+
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: fileName,
+    ));
+
+    final streamedRes = await request.send();
+    final res = await http.Response.fromStream(streamedRes);
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data['user'] != null) {
+        await saveStudentJson(data['user']);
+      }
+      return data;
+    }
+    final err = jsonDecode(res.body);
+    throw Exception(err['detail'] ?? 'Resume upload failed');
+  }
+
 
   // ── My Applications ────────────────────────────────────────────────
   static Future<List<dynamic>> getMyApplications() async {
@@ -203,6 +246,7 @@ class ApiService {
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Failed to fetch applications');
   }
+
 
   // ── My Schedule ────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getMySchedule() async {

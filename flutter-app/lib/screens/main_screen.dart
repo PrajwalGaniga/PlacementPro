@@ -17,31 +17,31 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    ProfileScreen(),
-    TrackerScreen(),
-    ResumeScreen(),
-    NetworkScreen(),
-  ];
+  void _switchTab(int index) {
+    if (mounted) setState(() => _index = index);
+  }
 
   void _logout() async {
     await ApiService.clearAll();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (_) => false,
-      );
+      Navigator.pushNamedAndRemoveUntil(context, '/selection', (route) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final screens = <Widget>[
+      HomeScreen(onSwitchTab: _switchTab),
+      const ProfileScreen(),
+      const TrackerScreen(),
+      const ResumeScreen(),
+      const NetworkScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
-        index: _index.clamp(0, _screens.length - 1),
-        children: _screens,
+        index: _index.clamp(0, screens.length - 1),
+        children: screens,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
@@ -64,4 +64,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-

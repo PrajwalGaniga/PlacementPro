@@ -43,7 +43,13 @@ async def generate_schedule(body: SchedulerRequest, tpo: dict = Depends(require_
     ).to_list(None)
 
     if not apps:
-        raise HTTPException(status_code=400, detail="No applicants found for this drive")
+        return {
+            "schedule_id": str(uuid.uuid4()),
+            "drive_id": body.drive_id,
+            "slots": [],
+            "total_slots": 0,
+            "message": "No applicants found for this drive. Cannot generate schedule.",
+        }
 
     # Enrich with student data
     enriched = []
@@ -141,6 +147,7 @@ async def update_schedule(drive_id: str, body: dict, tpo: dict = Depends(require
 async def notify_schedule(
     drive_id: str,
     background_tasks: BackgroundTasks,
+    test_mode: bool = Query(True, description="If true, only sends to developer test emails"),
     tpo: dict = Depends(require_tpo),
 ):
     sched = await db.interview_schedules().find_one({"drive_id": drive_id})
@@ -168,17 +175,30 @@ async def notify_schedule(
             "created_at": datetime.utcnow(),
         })
 
-        # Email in background
-        background_tasks.add_task(
-            send_interview_slot,
-            student.get("email", ""),
-            student.get("name", ""),
-            company,
-            slot.get("time_slot", ""),
-            slot.get("panel"),
-            slot.get("duration_minutes", 30),
-        )
-        count += 1
+        # Email in background (Dual Mode logic)
+        email = student.get("email", "").lower()
+        allowed_test_emails = {
+            "prajwalganiga06@gmail.com",
+            "sanvi.s.shetty18@gmail.com",
+            "varshiniganiga35@gmail.com",
+            "ishwarya9448@gmail.com"
+        }
+        
+        should_send = True
+        if test_mode and email not in allowed_test_emails:
+            should_send = False
+            
+        if should_send:
+            background_tasks.add_task(
+                send_interview_slot,
+                student.get("email", ""),
+                student.get("name", ""),
+                company,
+                slot.get("time_slot", ""),
+                slot.get("panel"),
+                slot.get("duration_minutes", 30),
+            )
+            count += 1
 
     await db.interview_schedules().update_one({"drive_id": drive_id}, {"$set": {"notified": True}})
     return {"message": f"Notified {count} students", "emails_sent": count}

@@ -13,7 +13,7 @@ from typing import Optional
 
 import joblib
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -45,9 +45,9 @@ if _model is None:
 # ──────────────────────────────────────────────────────────────
 # 2. Gemini setup
 # ──────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
 _GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
-genai.configure(api_key=_GEMINI_KEY)
-_gemini = genai.GenerativeModel("gemini-2.5-flash")
+_client = genai.Client(api_key=_GEMINI_KEY)
 
 # ──────────────────────────────────────────────────────────────
 # 3. Skill scorer (maps student skills list → 0-10 coding score)
@@ -96,7 +96,10 @@ async def _classify_intent(message: str) -> str:
         "Return ONLY the one-word category."
     )
     try:
-        resp = await _gemini.generate_content_async(prompt)
+        resp = await _client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
         word = resp.text.strip().upper()
         for intent in ["PREDICT", "COMPARE", "ADVICE", "FAQ"]:
             if intent in word:
@@ -244,7 +247,10 @@ Return STRICTLY valid JSON (no markdown, no explanation) in this exact schema:
 """
     comparison_data = {"similarities": [], "gaps": [], "action_steps": []}
     try:
-        resp = await _gemini.generate_content_async(gemini_prompt)
+        resp = await _client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=gemini_prompt
+        )
         raw_text = resp.text.strip()
         # Strip markdown fences if present
         raw_text = re.sub(r"^```[a-z]*\n?|\n?```$", "", raw_text, flags=re.MULTILINE).strip()
@@ -285,7 +291,10 @@ async def _layer_advice(student: dict, message: str) -> dict:
         "Never say you are an AI. Address the student by first name."
     )
     try:
-        resp = await _gemini.generate_content_async(f"[System]: {system}\n\nStudent: {message}")
+        resp = await _client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"[System]: {system}\n\nStudent: {message}"
+        )
         return {"type": "text", "text": resp.text.strip()}
     except Exception as e:
         return {"type": "text", "text": f"Sorry, I couldn't generate a response right now. ({e})"}

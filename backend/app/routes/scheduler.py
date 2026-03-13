@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from bson import ObjectId
 from typing import List, Optional
-import google.generativeai as genai
+from google import genai
 import os
 import json
 import io
@@ -18,7 +18,7 @@ from app.utils.otp import conf as mail_conf  # Reusing your mail config
 router = APIRouter(prefix="/scheduler", tags=["Scheduler"])
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash-latest"]
 
 class ScheduleConfig(BaseModel):
@@ -49,8 +49,10 @@ async def ai_smart_sort(jd_skills: List[str], students: List[dict]) -> List[str]
     
     for model_name in FALLBACK_MODELS:
         try:
-            model = genai.GenerativeModel(model_name)
-            res = model.generate_content(prompt).text.strip()
+            res = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            ).text.strip()
             if res.startswith("```"): res = res.split("```")[1].replace("json", "")
             return json.loads(res.strip())
         except Exception: continue
