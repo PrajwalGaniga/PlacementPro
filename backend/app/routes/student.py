@@ -267,17 +267,46 @@ async def get_student_list(
     branch: Optional[str] = None,
     placed: Optional[bool] = None,
     graduation_year: Optional[int] = None,
+    cgpa_min: Optional[float] = None,
+    cgpa_max: Optional[float] = None,
+    zero_backlogs: Optional[bool] = None,
+    skills: Optional[str] = None,
     current_user: dict = Depends(get_current_user) # TPO authenticates here
 ):
-    """Fetches all students for the TPO Dashboard"""
+    """Fetches all students for the TPO Dashboard with clean filtering"""
     print(f"\n[DEBUG-API] 🟡 Fetching student list for TPO...")
     try:
         db = get_db()
         query = {"college_id": current_user.get("college_id")}
         
-        if branch and branch != "All": query["branch"] = branch
+        import re
+        if branch and branch != "All": 
+            branch_map = {
+                "CSE": "Computer Science.*?Engineering|CSE",
+                "ECE": "Electronics.*?Communication|ECE",
+                "ME": "Mechanical|ME",
+                "CE": "Civil|CE",
+                "ISE": "Information Science|ISE",
+                "AI": "Artificial Intelligence|AI|AIML",
+            }
+            # Attempt to use a mapped regex pattern if present, otherwise fallback to exact match pattern
+            pattern = branch_map.get(branch.upper(), f"^{re.escape(branch)}$")
+            query["branch"] = re.compile(pattern, re.IGNORECASE)
         if placed is not None: query["placed"] = placed
         if graduation_year: query["graduation_year"] = graduation_year
+        
+        if cgpa_min is not None or cgpa_max is not None:
+            query["cgpa"] = {}
+            if cgpa_min is not None: query["cgpa"]["$gte"] = cgpa_min
+            if cgpa_max is not None: query["cgpa"]["$lte"] = cgpa_max
+            
+        if zero_backlogs: query["backlogs"] = 0
+            
+        if skills:
+            skill_list = [s.strip() for s in skills.split(',')]
+            # Use case-insensitive regex for array matching
+            import re
+            query["skills"] = {"$all": [re.compile(f"^{re.escape(s)}$", re.IGNORECASE) for s in skill_list]}
 
         students = await db["students"].find(query, {"_id": 0}).to_list(1000)
         print(f"[DEBUG-API] 🟢 Returning {len(students)} students to dashboard")
@@ -285,6 +314,107 @@ async def get_student_list(
     except Exception as e:
         print(f"[DEBUG-API] ❌ List error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+import pandas as pd
+
+@router.post("/import-students")
+async def import_students(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Import students from Excel/CSV and forcefully bulk assign to the TPO's college_id"""
+    print(f"\n[DEBUG-API] 🟡 Importing Students for TPO: {current_user.get('college_id')}...")
+    try:
+        if not file.filename.endswith((".xlsx", ".csv")):
+            raise HTTPException(status_code=400, detail="Only .xlsx or .csv files are supported")
+            
+        content = await file.read()
+        import io
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(content))
+        else:
+            df = pd.read_excel(io.BytesIO(content))
+            
+        # Clean columns: lowercase and strip whitespace
+        df.columns = [str(c).lower().strip() for c in df.columns]
+        
+        # Required minimal mapping
+        db = get_db()
+        college_id = current_user.get("college_id")
+        
+        students_to_insert = []
+        for index, row in df.iterrows():
+            usn = str(row.get("usn", f"UNKNOWN_{index}")).strip().upper()
+            if not usn or pd.isna(usn) or usn == "NAN": continue
+            
+            # Use placeholders for missing data as requested by the user
+            name = str(row.get("name", "Student Name"))
+            if pd.isna(name): name = "Student Name"
+            
+            email = str(row.get("email", f"{usn}@student.com"))
+            if pd.isna(email): email = f"{usn}@student.com"
+            
+            branch = str(row.get("branch", "General"))
+            if pd.isna(branch): branch = "General"
+            
+            try: cgpa = float(row.get("cgpa", 0.0))
+            except: cgpa = 0.0
+            if pd.isna(cgpa): cgpa = 0.0
+                
+            try: backlogs = int(row.get("backlogs", 0))
+            except: backlogs = 0
+            if pd.isna(backlogs): backlogs = 0
+                
+            try: graduation_year = int(row.get("graduation_year", 2025))
+            except: graduation_year = 2025
+            if pd.isna(graduation_year): graduation_year = 2025
+            
+            skills_raw = str(row.get("skills", ""))
+            skills = [s.strip().title() for s in skills_raw.split(",")] if skills_raw and not pd.isna(skills_raw) and skills_raw != "nan" else []
+                
+            student_doc = {
+                "college_id": college_id, # Tenant override
+                "usn": usn,
+                "name": name,
+                "email": email,
+                "branch": branch.title(),
+                "cgpa": cgpa,
+                "backlogs": backlogs,
+                "graduation_year": graduation_year,
+                "placed": False,
+                "skills": skills,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            students_to_insert.append(student_doc)
+            
+        if not students_to_insert:
+            raise HTTPException(status_code=400, detail="No readable student rows found in file")
+            
+        # Optional: delete existing so it's a clean "dump", or Upsert. Assuming Dump for now to easily reset states
+        # Bulk Upsert based on USN
+        from pymongo import UpdateOne
+        operations = [
+            UpdateOne(
+                {"usn": doc["usn"]}, 
+                {"$set": doc},
+                upsert=True
+            ) for doc in students_to_insert
+        ]
+        
+        result = await db["students"].bulk_write(operations)
+        print(f"[DEBUG-API] 🟢 Inserted/Updated {len(operations)} students.")
+        
+        return {
+            "message": f"Successfully imported {len(operations)} students",
+            "inserted": result.upserted_count,
+            "updated": result.modified_count
+        }
+            
+    except Exception as e:
+        print(f"[DEBUG-API] ❌ Import error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/batches")
 async def get_batches(current_user: dict = Depends(get_current_user)):

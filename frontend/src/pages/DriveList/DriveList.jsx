@@ -15,6 +15,7 @@ export default function DriveList() {
     const [loading, setLoading] = useState(true);
     const [notifyingId, setNotifyingId] = useState(null);
     const [notifyResult, setNotifyResult] = useState({});
+    const [notifyModalDrive, setNotifyModalDrive] = useState(null);
     const [driveSearch, setDriveSearch] = useState('');
 
     // --- Applicants Modal State ---
@@ -40,14 +41,20 @@ export default function DriveList() {
         catch { alert('Failed to delete drive'); }
     };
 
-    const handleNotify = async (drive) => {
+    const handleNotifyClick = (drive) => setNotifyModalDrive(drive);
+
+    const doNotify = async (drive, mode) => {
+        setNotifyModalDrive(null);
         setNotifyingId(drive._id);
         try {
-            const res = await notifyStudents({ drive_id: drive._id, college_id: localStorage.getItem('college_id') });
-            setNotifyResult(p => ({ ...p, [drive._id]: { type: 'success', text: `Sent ${res.data.real_emails_sent} emails` }}));
-            setTimeout(() => setNotifyResult(p => ({ ...p, [drive._id]: null })), 4000);
-        } catch {
-            setNotifyResult(p => ({ ...p, [drive._id]: { type: 'error', text: 'Notification failed' }}));
+            const res = await notifyStudents({ drive_id: drive._id, college_id: localStorage.getItem('college_id'), mode });
+            const count = res.data.sent_count || res.data.real_emails_sent || 0;
+            const label = mode === 'test' ? `Test emails sent to ${count} developers ✅` : `${res.data.total_eligible || 0} students notified (${count} real emails sent) ✅`;
+            setNotifyResult(p => ({ ...p, [drive._id]: { type: 'success', text: label }}));
+            setTimeout(() => setNotifyResult(p => ({ ...p, [drive._id]: null })), 5000);
+        } catch (err) {
+            const msg = err?.response?.data?.detail || 'Notification failed';
+            setNotifyResult(p => ({ ...p, [drive._id]: { type: 'error', text: msg }}));
         } finally { setNotifyingId(null); }
     };
 
@@ -165,7 +172,7 @@ export default function DriveList() {
                                     <button onClick={() => handleViewApplicants(drive)} style={{ flex: 1, padding: '10px', background: `${theme.accent1}15`, color: theme.accent1, border: `1px solid ${theme.accent1}30`, borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}>
                                         <Users size={14} /> Applicants
                                     </button>
-                                    <button onClick={() => handleNotify(drive)} disabled={notifyingId === drive._id} style={{ padding: '10px', background: 'transparent', color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Send Email Invites">
+                                    <button onClick={() => handleNotifyClick(drive)} disabled={notifyingId === drive._id} style={{ padding: '10px', background: notifyingId === drive._id ? `${theme.accent2}20` : 'transparent', color: theme.accent2, border: `1px solid ${notifyingId === drive._id ? theme.accent2 : theme.border}`, borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Send Email Invites">
                                         {notifyingId === drive._id ? <span className="spinner" style={{ width: 16, height: 16 }} /> : <Bell size={16} />}
                                     </button>
                                     <button onClick={() => handleDelete(drive._id)} style={{ padding: '10px', background: 'transparent', color: theme.danger, border: `1px solid ${theme.border}`, borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Delete Drive">
@@ -182,6 +189,43 @@ export default function DriveList() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* ── NOTIFY MODE MODAL ── */}
+            {notifyModalDrive && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(19,17,28,0.88)', backdropFilter: 'blur(12px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                    <div style={{ background: theme.cardBg, width: '100%', maxWidth: '480px', borderRadius: '20px', border: `1px solid ${theme.border}`, padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '20px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}><Bell size={20} color={theme.accent2} /> Send Notifications</h2>
+                                <p style={{ margin: '6px 0 0 0', color: theme.muted, fontSize: '13px' }}>{notifyModalDrive.company_name} — {notifyModalDrive.job_role}</p>
+                            </div>
+                            <button onClick={() => setNotifyModalDrive(null)} style={{ background: '#13111c', border: `1px solid ${theme.border}`, color: theme.muted, cursor: 'pointer', padding: '8px', borderRadius: '10px' }}><X size={18} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {/* Option A: All Eligible */}
+                            <button onClick={() => doNotify(notifyModalDrive, 'all')} style={{ padding: '20px', background: `${theme.accent1}15`, border: `1px solid ${theme.accent1}40`, borderRadius: '14px', color: 'white', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                    <Users size={20} color={theme.accent1} />
+                                    <span style={{ fontSize: '15px', fontWeight: '700', color: theme.accent1 }}>Notify All Eligible Students</span>
+                                </div>
+                                <p style={{ margin: 0, color: theme.muted, fontSize: '13px' }}>
+                                    Sends to all <strong style={{ color: 'white' }}>{notifyModalDrive.eligible_count || 0} eligible students</strong> in the database. Real emails are only dispatched to the approved developer list; all others are logged to terminal.
+                                </p>
+                            </button>
+                            {/* Option B: Test Group */}
+                            <button onClick={() => doNotify(notifyModalDrive, 'test')} style={{ padding: '20px', background: `${theme.accent2}15`, border: `1px solid ${theme.accent2}40`, borderRadius: '14px', color: 'white', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                    <Bell size={20} color={theme.accent2} />
+                                    <span style={{ fontSize: '15px', fontWeight: '700', color: theme.accent2 }}>Notify Developer Test Group</span>
+                                </div>
+                                <p style={{ margin: 0, color: theme.muted, fontSize: '13px' }}>
+                                    Sends a <strong style={{ color: 'white' }}>[TEST]</strong> email only to: prajwalganiga06@gmail.com, sanvi.s.shetty18@gmail.com, varshiniganiga35@gmail.com, ishwarya9448@gmail.com
+                                </p>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

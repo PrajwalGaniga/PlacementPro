@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Search, GraduationCap, Filter, User, X, Mail, Phone, Briefcase, Award, ExternalLink, Zap } from 'lucide-react';
-import { getStudents, getBatches } from '../../api';
+import { useState, useEffect, useRef } from 'react';
+import { Search, GraduationCap, Filter, User, X, Mail, Phone, Briefcase, Award, ExternalLink, Zap, Upload, CheckCircle2 } from 'lucide-react';
+import { getStudents, getBatches, importStudentsExcel } from '../../api';
 
 // --- Theme Constants ---
 const theme = {
@@ -19,6 +19,16 @@ export default function StudentList() {
     const [batches, setBatches] = useState([]);
     const [selectedBatch, setSelectedBatch] = useState('all');
     
+    // New Advanced Filters
+    const [minCgpa, setMinCgpa] = useState('');
+    const [maxCgpa, setMaxCgpa] = useState('');
+    const [zeroBacklogs, setZeroBacklogs] = useState(false);
+    const [skillsQuery, setSkillsQuery] = useState('');
+    
+    const [uploading, setUploading] = useState(false);
+    const [uploadSuccess, setUploadSuccess] = useState('');
+    const fileInputRef = useRef(null);
+    
     // Drawer State for "Student 360" View
     const [selectedStudent, setSelectedStudent] = useState(null);
 
@@ -26,16 +36,46 @@ export default function StudentList() {
         getBatches().then(r => setBatches(r.data)).catch(() => { });
     }, []);
 
-    useEffect(() => {
+    const fetchFilteredStudents = () => {
         const params = {};
         if (branch !== 'All') params.branch = branch;
         if (placedFilter === 'placed') params.placed = true;
         if (placedFilter === 'not-placed') params.placed = false;
         if (selectedBatch !== 'all') params.graduation_year = parseInt(selectedBatch);
+        if (minCgpa) params.cgpa_min = parseFloat(minCgpa);
+        if (maxCgpa) params.cgpa_max = parseFloat(maxCgpa);
+        if (zeroBacklogs) params.zero_backlogs = true;
+        if (skillsQuery) params.skills = skillsQuery;
 
         setLoading(true);
         getStudents(params).then(res => setStudents(res.data)).catch(() => setStudents([])).finally(() => setLoading(false));
-    }, [branch, placedFilter, selectedBatch]);
+    }
+
+    useEffect(() => {
+        fetchFilteredStudents();
+    }, [branch, placedFilter, selectedBatch, minCgpa, maxCgpa, zeroBacklogs]); // Note: skillsQuery is handled by a search button or debounce later
+    
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        setUploading(true);
+        setUploadSuccess('');
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            const res = await importStudentsExcel(formData);
+            setUploadSuccess(res.message);
+            fetchFilteredStudents(); // Refresh list after upload
+            setTimeout(() => setUploadSuccess(''), 5000);
+        } catch (error) {
+            alert('Failed to import students. Please check the file format.');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const filtered = students.filter(s =>
         s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -54,8 +94,15 @@ export default function StudentList() {
             {/* Header Area */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' }}>
                 <div>
-                    <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0 }}>Student Talent Hub</h1>
-                    <p style={{ color: theme.muted, marginTop: '8px' }}>Manage, filter, and track student placement readiness.</p>
+                    <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        Student Talent Hub
+                        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: `${theme.accent1}20`, border: `1px solid ${theme.accent1}50`, borderRadius: '12px', color: theme.accent1, fontSize: '14px', fontWeight: 'bold', cursor: uploading ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>
+                            {uploading ? <span className="spinner" style={{width: 16, height: 16}} /> : <Upload size={16} />}
+                            Import Excel
+                        </button>
+                        <input type="file" accept=".xlsx,.csv" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
+                    </h1>
+                    <p style={{ color: theme.muted, margin: 0 }}>Manage, filter, and track student placement readiness.</p>
                 </div>
                 
                 {/* Stats Row (Isometric Look) */}
@@ -71,26 +118,54 @@ export default function StudentList() {
                 </div>
             </div>
 
-            {/* Glassmorphic Toolbar */}
-            <div style={{ background: theme.cardBg, padding: '16px 24px', borderRadius: '20px', border: `1px solid ${theme.border}`, display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                    <Search size={18} color={theme.muted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input style={{ ...inputStyle, width: '100%', paddingLeft: '40px' }} placeholder="Search name, USN, or email..." value={search} onChange={e => setSearch(e.target.value)} />
+            {uploadSuccess && (
+                <div style={{ marginBottom: '24px', padding: '12px 16px', background: `${theme.success}15`, border: `1px solid ${theme.success}40`, borderRadius: '12px', color: theme.success, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                    <CheckCircle2 size={18} /> {uploadSuccess}
                 </div>
-                
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <select style={inputStyle} value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}>
+            )}
+
+            {/* Glassmorphic Toolbar - Advanced Filtering */}
+            <div style={{ background: theme.cardBg, padding: '20px 24px', borderRadius: '20px', border: `1px solid ${theme.border}`, marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    
+                    {/* Search & Skills */}
+                    <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                        <Search size={18} color={theme.muted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input style={{ ...inputStyle, width: '100%', paddingLeft: '40px' }} placeholder="Search name, USN, or email..." value={search} onChange={e => setSearch(e.target.value)} />
+                    </div>
+                    <div style={{ position: 'relative', flex: '1 1 200px', display: 'flex', gap: '8px' }}>
+                        <input style={{ ...inputStyle, width: '100%' }} placeholder="Skills (comma seq)..." value={skillsQuery} onChange={e => setSkillsQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchFilteredStudents()} />
+                        <button onClick={fetchFilteredStudents} style={{ padding: '0 16px', background: theme.accent1, border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>Find</button>
+                    </div>
+
+                    {/* Standard Dropdowns */}
+                    <select style={{ ...inputStyle, width: 'auto' }} value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}>
                         <option value="all">All Batches</option>
                         {batches.map(b => <option key={b} value={b}>{b} Batch</option>)}
                     </select>
-                    <select style={inputStyle} value={branch} onChange={e => setBranch(e.target.value)}>
+                    <select style={{ ...inputStyle, width: 'auto' }} value={branch} onChange={e => setBranch(e.target.value)}>
                         {BRANCHES.map(b => <option key={b}>{b}</option>)}
                     </select>
-                    <select style={inputStyle} value={placedFilter} onChange={e => setPlacedFilter(e.target.value)}>
+                    <select style={{ ...inputStyle, width: 'auto' }} value={placedFilter} onChange={e => setPlacedFilter(e.target.value)}>
                         <option value="all">All Status</option>
                         <option value="placed">Placed</option>
                         <option value="not-placed">Unplaced</option>
                     </select>
+                </div>
+
+                {/* CGPA & Backlogs Row */}
+                <div style={{ display: 'flex', gap: '24px', marginTop: '16px', padding: '16px', background: '#13111c', borderRadius: '12px', border: `1px solid ${theme.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '13px', color: theme.muted, fontWeight: 'bold' }}>CGPA Range:</span>
+                        <input type="number" step="0.1" max="10" min="0" placeholder="Min" style={{ ...inputStyle, width: '80px', padding: '8px' }} value={minCgpa} onChange={e => setMinCgpa(e.target.value)} />
+                        <span style={{ color: theme.muted }}>-</span>
+                        <input type="number" step="0.1" max="10" min="0" placeholder="Max" style={{ ...inputStyle, width: '80px', padding: '8px' }} value={maxCgpa} onChange={e => setMaxCgpa(e.target.value)} />
+                    </div>
+                    <div style={{ width: '1px', background: theme.border }}></div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: zeroBacklogs ? theme.success : theme.text }}>
+                        <input type="checkbox" checked={zeroBacklogs} onChange={e => setZeroBacklogs(e.target.checked)} style={{ accentColor: theme.success, width: '18px', height: '18px', cursor: 'pointer' }} />
+                        <span style={{ fontSize: '14px', fontWeight: zeroBacklogs ? 'bold' : 'normal' }}>Zero Backlogs Only</span>
+                    </label>
                 </div>
             </div>
 

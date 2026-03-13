@@ -119,7 +119,22 @@ def get_eligibility_query(college_id: str, drive_doc: dict) -> dict:
     }
     
     if drive_doc.get("eligible_branches"):
-        query["branch"] = {"$in": drive_doc["eligible_branches"]}
+        import re
+        branch_map = {
+            "CSE": "Computer Science.*?Engineering|CSE",
+            "ECE": "Electronics.*?Communication|ECE",
+            "ME": "Mechanical|ME",
+            "CE": "Civil|CE",
+            "ISE": "Information Science|ISE",
+            "AI": "Artificial Intelligence|AI|AIML",
+        }
+        regex_list = []
+        for b in drive_doc["eligible_branches"]:
+            if not b: continue
+            pattern = branch_map.get(b.upper(), f"^{re.escape(b)}$")
+            regex_list.append(re.compile(pattern, re.IGNORECASE))
+        if regex_list:
+            query["branch"] = {"$in": regex_list}
         
     if drive_doc.get("target_batches"):
         batch_years = [int(b) for b in drive_doc["target_batches"] if str(b).isdigit()]
@@ -221,14 +236,85 @@ async def create_drive(
     drive: Drive,
     current_user: dict = Depends(get_current_user),
 ):
-    """Create a new placement drive (JSON body)."""
+    """Create a new placement drive (JSON body) and compute real-time eligibility."""
     try:
+        import re
         db = get_db()
         drive_dict = drive.dict()
-        drive_dict["college_id"] = current_user.get("college_id")
+        college_id = current_user.get("college_id")
+        drive_dict["college_id"] = college_id
         drive_dict["created_by"] = current_user.get("sub")
+        
+        # 1. Fetch all students for the college
+        students_cursor = db["students"].find({"college_id": college_id})
+        students = await students_cursor.to_list(length=None)
+        
+        # Branch mapping for case-insensitive eval
+        branch_map = {
+            "CSE": "Computer Science.*?Engineering|CSE",
+            "ECE": "Electronics.*?Communication|ECE",
+            "ME": "Mechanical|ME",
+            "CE": "Civil|CE",
+            "ISE": "Information Science|ISE",
+            "AI": "Artificial Intelligence|AI|AIML",
+        }
+        eligible_patterns = []
+        for b in drive_dict.get("eligible_branches", []):
+            if not b: continue
+            pattern = branch_map.get(b.upper(), f"^{re.escape(b)}$")
+            eligible_patterns.append(re.compile(pattern, re.IGNORECASE))
+            
+        req_skills = [s.strip().lower() for s in drive_dict.get("required_skills", []) if s.strip()]
+
+        eligible_usns = []
+        ineligible_list = []
+        
+        # 2. Evaluate each student
+        for student in students:
+            reasons = []
+            
+            # CGPA Check
+            req_cgpa = float(drive_dict.get("min_cgpa", 0))
+            if student.get("cgpa", 0.0) < req_cgpa:
+                reasons.append(f"• Minimum CGPA required is {req_cgpa} (Current: {student.get('cgpa', 0.0)})")
+                
+            # Backlogs Check
+            req_backlogs = int(drive_dict.get("max_backlogs", 10))
+            if student.get("backlogs", 0) > req_backlogs:
+                reasons.append(f"• Candidate must have {req_backlogs} or fewer active backlogs (Current: {student.get('backlogs', 0)})")
+                
+            # Branch Check
+            student_branch = student.get("branch", "")
+            if eligible_patterns and student_branch:
+                if not any(pat.match(student_branch) for pat in eligible_patterns):
+                    reasons.append(f"• Branch '{student_branch}' is not eligible for this drive")
+            elif eligible_patterns and not student_branch:
+                 reasons.append("• Student profile is missing branch information")
+                 
+            # Skills Check
+            student_skills = [s.strip().lower() for s in student.get("skills", []) if s.strip()]
+            for rs in req_skills:
+                # Basic string inclusion check per skill required
+                if rs not in student_skills:
+                    reasons.append(f"• Requires '{rs}' skill in profile")
+            
+            if not reasons:
+                eligible_usns.append(student.get("usn"))
+            else:
+                ineligible_list.append({
+                    "student_id": student.get("usn"),
+                    "name": student.get("name", "Unknown"),
+                    "is_eligible": False,
+                    "reasons": reasons
+                })
+                
+        # 3. Append evaluated arrays
+        drive_dict["eligible_students"] = eligible_usns
+        drive_dict["ineligible_students"] = ineligible_list
+        drive_dict["eligible_count"] = len(eligible_usns)
+
         result = await db["drives"].insert_one(drive_dict)
-        return {"message": "Drive created", "drive_id": str(result.inserted_id)}
+        return {"message": "Drive created and eligibility calculated", "drive_id": str(result.inserted_id), "eligible_count": len(eligible_usns)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Create drive failed: {str(e)}")
 
@@ -246,9 +332,13 @@ async def list_drives(current_user: dict = Depends(get_current_user)):
         
         for d in drives:
             d["_id"] = str(d["_id"])
-            query = get_eligibility_query(college_id, d)
-            d["eligible_count"] = await db["students"].count_documents(query)
+            # Prefer stored eligible_count (computed correctly during drive creation)
+            # Fall back to a live re-count for legacy drives that predated this feature
+            if "eligible_count" not in d or d.get("eligible_count", -1) == -1:
+                query = get_eligibility_query(college_id, d)
+                d["eligible_count"] = await db["students"].count_documents(query)
             d["applied_count"] = len(d.get("applied_students", []))
+            d["ineligible_count"] = len(d.get("ineligible_students", []))
 
         return drives
     except Exception as e:
@@ -272,9 +362,16 @@ async def check_eligibility(criteria: EligibilityCheck, current_user: dict = Dep
         raise HTTPException(status_code=500, detail=f"Eligibility check failed: {str(e)}")
 
 
+DEV_TEST_EMAILS = [
+    "prajwalganiga06@gmail.com",
+    "sanvi.s.shetty18@gmail.com",
+    "varshiniganiga35@gmail.com",
+    "ishwarya9448@gmail.com",
+]
+
 @router.post("/notify")
 async def notify_students(req: NotifyRequest, current_user: dict = Depends(get_current_user)):
-    """Strictly notify ONLY eligible students."""
+    """Dual-mode notification: 'test' sends to developer group, 'all' sends to all eligible students."""
     try:
         db = get_db()
         from bson import ObjectId
@@ -282,20 +379,9 @@ async def notify_students(req: NotifyRequest, current_user: dict = Depends(get_c
         if not drive_doc:
             raise HTTPException(status_code=404, detail="Drive not found")
 
-        # 1. Fetch strictly eligible students
-        query = get_eligibility_query(req.college_id, drive_doc)
-        students = await db["students"].find(query, {"name": 1, "email": 1}).to_list(length=1000)
+        college_id = req.college_id or current_user.get("college_id")
 
-        # 🚨 THE FIX: Abort instantly if nobody is eligible
-        if not students:
-            raise HTTPException(status_code=400, detail="0 students are eligible for this drive. No emails sent.")
-
-        real_sent = []
-        logged = []
-        fm = FastMail(mail_conf)
-
-        print("\n🚀 --- STARTING EMAIL DISPATCH ---")
-
+        # Build the email HTML body
         html = f"""
         <div style="font-family:Inter,sans-serif;max-width:520px;margin:auto;
                     background:#0f172a;padding:32px;border-radius:12px;color:#e2e8f0">
@@ -307,33 +393,76 @@ async def notify_students(req: NotifyRequest, current_user: dict = Depends(get_c
                 <td style="padding:8px;font-weight:600">{drive_doc.get('job_role','—')}</td></tr>
             <tr><td style="padding:8px;color:#94a3b8">Package</td>
                 <td style="padding:8px;font-weight:600">{drive_doc.get('package_ctc','—')}</td></tr>
+            <tr><td style="padding:8px;color:#94a3b8">Min CGPA</td>
+                <td style="padding:8px;font-weight:600">{drive_doc.get('min_cgpa','—')}</td></tr>
           </table>
           <p style="color:#94a3b8;font-size:13px">Login to PlacementPro AI for full details.</p>
         </div>
         """
 
-        # 2. Only send to test emails IF the system found eligible students
-        for test_email in REAL_EMAIL_RECIPIENTS:
-            msg = MessageSchema(subject=f"Placement Drive Alert – {drive_doc.get('company_name','')}", recipients=[test_email], body=html, subtype="html")
-            try:
-                await fm.send_message(msg)
-                real_sent.append(test_email)
-            except Exception as mail_err:
-                print(f"❌ ERROR: Failed to send to {test_email}. Reason: {mail_err}")
+        fm = FastMail(mail_conf)
+        real_sent = []
+        subject = f"Placement Drive Alert – {drive_doc.get('company_name','')}"
 
-        # 3. Log real database students
-        for s in students:
-            email = s.get("email", "")
-            name = s.get("name", "Student")
-            print(f"📋 LOG ONLY: Would have sent to → {name} <{email}>")
-            logged.append(email)
+        if req.mode == "test":
+            # ── TEST MODE: only send to dev group ──
+            print("\n🧪 NOTIFY MODE: Developer Test Group")
+            for email in DEV_TEST_EMAILS:
+                try:
+                    msg = MessageSchema(subject=f"[TEST] {subject}", recipients=[email], body=html, subtype="html")
+                    await fm.send_message(msg)
+                    real_sent.append(email)
+                    print(f"  ✅ Sent to {email}")
+                except Exception as e:
+                    print(f"  ❌ Failed to send to {email}: {e}")
+            return {
+                "message": f"Test notifications sent to developer group",
+                "mode": "test",
+                "sent_count": len(real_sent),
+                "recipients": real_sent
+            }
 
-        return {
-            "message": "Notifications dispatched",
-            "total_eligible": len(students),
-            "real_emails_sent": len(real_sent),
-            "logged_count": len(logged),
-        }
+        else:
+            # ── ALL MODE: use stored eligible_students from drive ──
+            eligible_usns = drive_doc.get("eligible_students", [])
+            
+            # Fall back to live eligibility query if drive has no stored list
+            if not eligible_usns:
+                query = get_eligibility_query(college_id, drive_doc)
+                students = await db["students"].find(query, {"usn": 1}).to_list(length=1000)
+                eligible_usns = [s.get("usn") for s in students if s.get("usn")]
+
+            if not eligible_usns:
+                raise HTTPException(status_code=400, detail="0 students are eligible for this drive. No emails sent.")
+
+            students = await db["students"].find({"usn": {"$in": eligible_usns}}, {"name": 1, "email": 1}).to_list(length=1000)
+            
+            print(f"\n🚀 NOTIFY MODE: All Eligible ({len(students)} students)")
+            logged = []
+            for student in students:
+                email = student.get("email", "")
+                name = student.get("name", "Student")
+                # Only send to developer safelist, log the rest
+                if email in DEV_TEST_EMAILS:
+                    try:
+                        msg = MessageSchema(subject=subject, recipients=[email], body=html, subtype="html")
+                        await fm.send_message(msg)
+                        real_sent.append(email)
+                        print(f"  ✅ REAL SEND → {name} <{email}>")
+                    except Exception as e:
+                        print(f"  ❌ Failed → {email}: {e}")
+                else:
+                    print(f"  📋 LOG ONLY → {name} <{email}>")
+                    logged.append(email)
+
+            return {
+                "message": f"Notifications dispatched for {len(students)} eligible students",
+                "mode": "all",
+                "total_eligible": len(students),
+                "real_emails_sent": len(real_sent),
+                "logged_count": len(logged),
+                "sent_count": len(real_sent)
+            }
     except HTTPException:
         raise
     except Exception as e:

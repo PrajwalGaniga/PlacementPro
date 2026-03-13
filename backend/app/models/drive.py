@@ -37,6 +37,11 @@ class Drive(BaseModel):
 
     # Legacy compat (keep for old clients)
     description: Optional[str] = None
+    
+    # ── Eligibility Tracking ─────────────────────────────────────────────────
+    eligible_count: int = 0
+    eligible_students: List[str] = []        # array of student USNs
+    ineligible_students: List[dict] = []     # array of dicts {"student_id": USN, "name": Name, "is_eligible": False, "reasons": []}
 
 
 class EligibilityCheck(BaseModel):
@@ -52,4 +57,5 @@ class EligibilityCheck(BaseModel):
 
 class NotifyRequest(BaseModel):
     drive_id: str
-    college_id: str
+    college_id: Optional[str] = None
+    mode: str = "all"   # "all" | "test"

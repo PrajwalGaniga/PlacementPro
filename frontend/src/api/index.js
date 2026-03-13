@@ -47,6 +47,7 @@ export const notifyStudents = (data) => API.post('/drive/notify', data);
 export const deleteDrive = (id) => API.delete(`/drive/${id}`);
 
 // ── Student ──────────────────────────────────────────────────────
+export const importStudentsExcel = (formData) => API.post('/student/import-students', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const getStudents = (params) => API.get('/student/list', { params });
 export const getStudentStats = () => API.get('/student/stats');
 export const getBatches = () => API.get('/student/batches');

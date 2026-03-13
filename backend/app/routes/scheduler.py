@@ -1,12 +1,14 @@
 import traceback
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from bson import ObjectId
-from typing import List
+from typing import List, Optional
 import google.generativeai as genai
 import os
 import json
+import io
 
 from app.database import get_db
 from app.utils.auth import get_current_user
@@ -31,6 +33,7 @@ class ScheduleConfig(BaseModel):
 
 class NotifyScheduleRequest(BaseModel):
     drive_id: str
+    mode: str = "all"   # "all" | "test"
 
 SORTING_PROMPT = """
 You are an expert Technical Interview Scheduler AI.
@@ -60,7 +63,23 @@ def get_eligibility_query(college_id: str, drive_doc: dict) -> dict:
         "cgpa": {"$gte": float(drive_doc.get("min_cgpa", 0))},
         "backlogs": {"$lte": int(drive_doc.get("max_backlogs", 10))}
     }
-    if drive_doc.get("eligible_branches"): query["branch"] = {"$in": drive_doc["eligible_branches"]}
+    if drive_doc.get("eligible_branches"):
+        import re
+        branch_map = {
+            "CSE": "Computer Science.*?Engineering|CSE",
+            "ECE": "Electronics.*?Communication|ECE",
+            "ME": "Mechanical|ME",
+            "CE": "Civil|CE",
+            "ISE": "Information Science|ISE",
+            "AI": "Artificial Intelligence|AI|AIML",
+        }
+        regex_list = []
+        for b in drive_doc["eligible_branches"]:
+            if not b: continue
+            pattern = branch_map.get(b.upper(), f"^{re.escape(b)}$")
+            regex_list.append(re.compile(pattern, re.IGNORECASE))
+        if regex_list:
+            query["branch"] = {"$in": regex_list}
     if drive_doc.get("target_batches"):
         batch_years = [int(b) for b in drive_doc["target_batches"] if str(b).isdigit()]
         if batch_years: query["graduation_year"] = {"$in": batch_years}
@@ -97,18 +116,18 @@ async def generate_schedule(config: ScheduleConfig, current_user: dict = Depends
 
         if max_capacity <= 0: raise HTTPException(status_code=400, detail="Invalid time configuration.")
 
-        # 🚨 THE FIX: Strict query for scheduling
-        query = get_eligibility_query(current_user["college_id"], drive)
-        
-        # If we have real applied students, filter by them
+        # 1. Check: Were there any actual applicants for this drive?
         applied_usns = drive.get("applied_students", [])
-        if applied_usns:
-            query["usn"] = {"$in": applied_usns}
+        if not applied_usns:
+            raise HTTPException(status_code=400, detail="No students have applied for this drive yet. Share the drive link with students first.")
 
+        # 2. Fetch only the applied students who also meet eligibility criteria
+        query = get_eligibility_query(current_user["college_id"], drive)
+        query["usn"] = {"$in": applied_usns}
         students = await db["students"].find(query).to_list(length=max_capacity)
-        
-        if not students: 
-            raise HTTPException(status_code=400, detail="No eligible students found to schedule. Check drive criteria.")
+
+        if not students:
+            raise HTTPException(status_code=400, detail=f"{len(applied_usns)} student(s) applied but none meet the drive's eligibility criteria (CGPA, backlogs, branch). Check drive settings.")
 
         sorted_usns = await ai_smart_sort(drive.get("required_skills", []), students)
         student_map = {s.get("usn"): s for s in students if s.get("usn")}
@@ -156,143 +175,132 @@ async def generate_schedule(config: ScheduleConfig, current_user: dict = Depends
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-# Add this near the top of your file with your other constants if you haven't already
-REAL_EMAIL_RECIPIENTS = {"prajwalganiga06@gmail.com", "ishwarya9448@gmail.com", "muktarb28@gmail.com"}
+SCHEDULER_DEV_EMAILS = [
+    "prajwalganiga06@gmail.com",
+    "sanvi.s.shetty18@gmail.com",
+    "varshiniganiga35@gmail.com",
+    "ishwarya9448@gmail.com",
+]
+
+@router.get("/export-excel/{drive_id}")
+async def export_schedule_excel(drive_id: str, current_user: dict = Depends(get_current_user)):
+    """Export the current schedule for a drive as an Excel file."""
+    try:
+        import openpyxl
+        db = get_db()
+        schedule = await db["interviews"].find({"drive_id": drive_id}).to_list(length=1000)
+        if not schedule:
+            raise HTTPException(status_code=404, detail="No schedule found for this drive.")
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Interview Schedule"
+        ws.append(["Student Name", "USN", "Date", "Slot Time", "End Time", "Panel"])
+        for slot in schedule:
+            ws.append([
+                slot.get("name", ""),
+                slot.get("usn", ""),
+                slot.get("date_str", ""),
+                datetime.fromisoformat(slot["start_time"]).strftime("%I:%M %p"),
+                datetime.fromisoformat(slot["end_time"]).strftime("%I:%M %p"),
+                slot.get("panel", ""),
+            ])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="schedule_{drive_id}.xlsx"'}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Excel export failed: {str(e)}")
 
 @router.post("/notify")
 async def notify_schedule(req: NotifyScheduleRequest, current_user: dict = Depends(get_current_user)):
-    """Emails each student their precise interview slot (Test Logic Applied)."""
+    """Dual-mode schedule notification: 'test' sends to dev group, 'all' sends personalized slot emails."""
     try:
         db = get_db()
         drive = await db["drives"].find_one({"_id": ObjectId(req.drive_id)})
         schedule = await db["interviews"].find({"drive_id": req.drive_id}).to_list(length=1000)
         
-        if not schedule: 
-            raise HTTPException(status_code=404, detail="No schedule found to notify.")
+        if not schedule:
+            raise HTTPException(status_code=404, detail="No schedule found. Generate a schedule first.")
 
         fm = FastMail(mail_conf)
-        company = drive.get("company_name", "Company")
+        company = drive.get("company_name", "Company") if drive else "Company"
+        real_sent = []
 
-        print("\n🚀 --- STARTING SCHEDULER EMAIL DISPATCH ---")
+        def build_slot_html(name: str, slot: dict) -> str:
+            t_s = datetime.fromisoformat(slot["start_time"]).strftime("%I:%M %p")
+            t_e = datetime.fromisoformat(slot["end_time"]).strftime("%I:%M %p")
+            return f"""
+<div style="font-family:Inter,sans-serif;max-width:600px;margin:auto;background:#0f172a;border-radius:12px;overflow:hidden">
+  <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:28px;text-align:center;color:#fff">
+    <h1 style="margin:0;font-size:22px">Interview Confirmation</h1>
+    <p style="opacity:.9;margin:6px 0 0;font-size:14px">Your slot has been successfully scheduled</p>
+  </div>
+  <div style="padding:28px;color:#e2e8f0">
+    <p>Dear <strong>{name}</strong>,</p>
+    <p>Your interview with <strong style="color:#6366f1">{company}</strong> has been scheduled. Details:</p>
+    <div style="background:#1e293b;padding:18px;border-radius:10px;border-left:4px solid #6366f1;margin:20px 0">
+      <table style="width:100%;font-size:14px">
+        <tr><td style="padding:6px 0;color:#94a3b8">Date</td><td style="text-align:right">{slot.get('date_str')}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8">Time</td><td style="text-align:right">{t_s} – {t_e}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8">Panel</td><td style="text-align:right">{slot.get('panel')}</td></tr>
+      </table>
+    </div>
+    <p style="color:#94a3b8;font-size:13px">⏰ Join 10 minutes before. Keep resume and ID ready.</p>
+  </div>
+</div>"""
 
-        # 1. FORCE SEND REAL EMAILS TO YOUR 3 TESTERS
-        # We grab the first slot's timing just to show a realistic example in the test email
-        sample_slot = schedule[0]
-        t_start = datetime.fromisoformat(sample_slot["start_time"]).strftime("%I:%M %p")
-        t_end = datetime.fromisoformat(sample_slot["end_time"]).strftime("%I:%M %p")
+        if req.mode == "test":
+            print("\n🧪 SCHEDULER NOTIFY: Developer Test Group")
+            sample = schedule[0]
+            html = build_slot_html("Test User", sample)
+            for email in SCHEDULER_DEV_EMAILS:
+                try:
+                    msg = MessageSchema(subject=f"[TEST] Interview Slot – {company}", recipients=[email], body=html, subtype="html")
+                    await fm.send_message(msg)
+                    real_sent.append(email)
+                    print(f"  ✅ Sent to {email}")
+                except Exception as e:
+                    print(f"  ❌ Failed {email}: {e}")
+            return {"message": f"Test emails sent to {len(real_sent)} developers.", "mode": "test", "sent_count": len(real_sent)}
 
-        html = f"""
-<div style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
-  <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-    
-    <!-- Header -->
-    <tr>
-      <td style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:30px;text-align:center;color:#ffffff;">
-        <h1 style="margin:0;font-size:22px;font-weight:600;">Interview Confirmation</h1>
-        <p style="margin:8px 0 0;font-size:14px;opacity:0.9;">Your interview has been successfully scheduled</p>
-      </td>
-    </tr>
+        else:
+            # ALL mode: send personalized slot emails
+            print(f"\n🚀 SCHEDULER NOTIFY: All Scheduled ({len(schedule)} students)")
+            logged = []
+            for slot in schedule:
+                email = slot.get("email", "")
+                name = slot.get("name", "Student")
+                html = build_slot_html(name, slot)
+                if email in SCHEDULER_DEV_EMAILS:
+                    try:
+                        msg = MessageSchema(subject=f"Interview Slot – {company}", recipients=[email], body=html, subtype="html")
+                        await fm.send_message(msg)
+                        real_sent.append(email)
+                        print(f"  ✅ REAL SEND → {name} <{email}>")
+                    except Exception as e:
+                        print(f"  ❌ Failed → {email}: {e}")
+                else:
+                    print(f"  📋 LOG ONLY → {name} <{email}> | {slot.get('panel')} at {datetime.fromisoformat(slot['start_time']).strftime('%I:%M %p')}")
+                    logged.append(email)
 
-    <!-- Body -->
-    <tr>
-      <td style="padding:30px;color:#334155;">
-        
-        <p style="font-size:16px;margin-bottom:20px;">
-          Dear <strong>Test User</strong>,
-        </p>
-
-        <p style="font-size:15px;line-height:1.6;margin-bottom:20px;">
-          We are pleased to inform you that your interview with 
-          <strong style="color:#6366f1;">{company}</strong> has been successfully scheduled. 
-          Please find the details below:
-        </p>
-
-        <!-- Interview Details Card -->
-        <div style="background:#f8fafc;padding:20px;border-radius:10px;border-left:5px solid #6366f1;margin-bottom:25px;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
-            <tr>
-              <td style="padding:8px 0;"><strong>Date:</strong></td>
-              <td style="padding:8px 0;text-align:right;">{sample_slot.get('date_str')}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 0;"><strong>Time:</strong></td>
-              <td style="padding:8px 0;text-align:right;">{t_start} - {t_end}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 0;"><strong>Interview Panel:</strong></td>
-              <td style="padding:8px 0;text-align:right;">{sample_slot.get('panel')}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 0;"><strong>Mode:</strong></td>
-              <td style="padding:8px 0;text-align:right;">Virtual / On-site</td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Important Instructions -->
-        <div style="background:#eef2ff;padding:15px;border-radius:8px;margin-bottom:20px;">
-          <p style="margin:0;font-size:14px;color:#3730a3;">
-            ⏰ <strong>Please join 10 minutes before the scheduled time.</strong><br/>
-            📄 Keep a copy of your resume and valid ID ready.<br/>
-            📅 Kindly add this event to your calendar to avoid missing it.
-          </p>
-        </div>
-
-        <p style="font-size:14px;line-height:1.6;">
-          If you have any questions or need to reschedule, please contact our HR team 
-          at <a href="mailto:hr@{company.lower()}.com" style="color:#6366f1;text-decoration:none;">hr@{company.lower()}.com</a>.
-        </p>
-
-        <p style="margin-top:30px;font-size:15px;">
-          We look forward to speaking with you.
-        </p>
-
-        <p style="margin-top:20px;font-size:14px;">
-          Best Regards,<br/>
-          <strong>{company} Recruitment Team</strong>
-        </p>
-      </td>
-    </tr>
-
-    <!-- Footer -->
-    <tr>
-      <td style="background:#f8fafc;text-align:center;padding:20px;font-size:12px;color:#64748b;">
-        © {company} | All rights reserved.<br/>
-        This is an automated email. Please do not reply directly.
-      </td>
-    </tr>
-
-  </table>
-</div>
-"""
-
-        for test_email in REAL_EMAIL_RECIPIENTS:
-            msg = MessageSchema(
-                subject=f"Interview Slot - {company}", 
-                recipients=[test_email], 
-                body=html, 
-                subtype="html"
-            )
-            try:
-                await fm.send_message(msg)
-                print(f"✅ SUCCESS: Real schedule email sent to test address → {test_email}")
-            except Exception as mail_err:
-                print(f"❌ ERROR: Failed to send to {test_email}. Reason: {mail_err}")
-
-        # 2. LOG THE ACTUAL DB STUDENTS TO TERMINAL
-        print("\n📋 --- LOGGING SCHEDULED STUDENTS ---")
-        for slot in schedule:
-            email = slot.get("email", "")
-            name = slot.get("name", "Student")
-            slot_time = datetime.fromisoformat(slot["start_time"]).strftime("%I:%M %p")
-            print(f"📋 LOG ONLY: Would have sent schedule to → {name} <{email}> for {slot.get('panel')} at {slot_time}")
-
-        print("🏁 --- DISPATCH COMPLETE ---\n")
-
-        # 3. TRICK THE FRONTEND: Return the total number of scheduled students
-        return {
-            "message": "Notifications sent!", 
-            "sent_count": len(schedule) 
-        }
-    except Exception as e: 
+            return {
+                "message": f"Schedule notifications dispatched for {len(schedule)} students.",
+                "mode": "all",
+                "total_scheduled": len(schedule),
+                "real_emails_sent": len(real_sent),
+                "logged_count": len(logged),
+                "sent_count": len(real_sent)
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

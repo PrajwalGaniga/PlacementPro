@@ -12,6 +12,13 @@ export const uploadStudentExcel = async (formData) => {
   return res.data;
 };
 
+export const importStudentsExcel = async (formData) => {
+  const res = await api.post('/student/import-students', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return res.data;
+};
+
 export const getStudents = async (page = 1, limit = 10, branch = null, placed = null) => {
   let url = `/tpo/students/list?page=${page}&limit=${limit}`;
   if (branch) url += `&branch=${encodeURIComponent(branch)}`;

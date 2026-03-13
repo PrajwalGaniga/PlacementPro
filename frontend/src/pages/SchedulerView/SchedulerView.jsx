@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { getDrives, generateSchedule, notifySchedule, exportScheduleExcel } from '../../api';
-import { Calendar as CalendarIcon, Wand2, Send, Clock, Users, CalendarDays, CheckCircle2, Download, ChevronRight, LayoutGrid } from 'lucide-react';
+import { getDrives, generateSchedule, notifySchedule } from '../../api';
+import { Calendar as CalendarIcon, Wand2, Send, Clock, Users, CalendarDays, CheckCircle2, Download, ChevronRight, LayoutGrid, Bell, X } from 'lucide-react';
+import API from '../../api';
 
 // --- Theme Constants ---
 const theme = {
     bg: '#13111c', cardBg: '#1e1c2e', border: '#2d2b42', text: '#e2e8f0', 
-    muted: '#94a3b8', accent1: '#8b5cf6', accent2: '#ec4899', success: '#10b981'
+    muted: '#94a3b8', accent1: '#8b5cf6', accent2: '#ec4899', success: '#10b981', danger: '#f43f5e'
 };
 
 export default function SchedulerView() {
@@ -13,9 +14,11 @@ export default function SchedulerView() {
     const [selectedDrive, setSelectedDrive] = useState('');
     const [schedule, setSchedule] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [notifying, setNotifying] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
+    const [errorMsg, setErrorMsg] = useState('');
+    const [notifyModal, setNotifyModal] = useState(false);
+    const [notifying, setNotifying] = useState(false);
 
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -30,7 +33,7 @@ export default function SchedulerView() {
 
     const handleGenerate = async () => {
         if (!selectedDrive) return;
-        setLoading(true); setSuccessMsg(''); setSchedule([]);
+        setLoading(true); setSuccessMsg(''); setErrorMsg(''); setSchedule([]);
         try {
             const res = await generateSchedule({
                 drive_id: selectedDrive, start_date: startDate, end_date: endDate,
@@ -39,16 +42,42 @@ export default function SchedulerView() {
             });
             setSchedule(res.data.schedule);
             setSuccessMsg(res.data.message);
-        } catch (err) { alert('Scheduling failed.'); } finally { setLoading(false); }
+        } catch (err) {
+            const msg = err?.response?.data?.detail || 'Scheduling failed.';
+            setErrorMsg(msg);
+        } finally { setLoading(false); }
     };
 
-    const handleNotify = async () => {
-        if (!window.confirm("Send official email invites?")) return;
+    const doNotify = async (mode) => {
+        setNotifyModal(false);
         setNotifying(true);
         try {
-            const res = await notifySchedule({ drive_id: selectedDrive });
-            setSuccessMsg(`Success! Sent ${res.data.sent_count} emails.`);
-        } catch (err) { alert('Notification failed.'); } finally { setNotifying(false); }
+            const res = await notifySchedule({ drive_id: selectedDrive, mode });
+            const count = res.data.sent_count || 0;
+            setSuccessMsg(
+                mode === 'test'
+                    ? `✅ Test emails sent to ${count} developers.`
+                    : `✅ Notifications sent! (${res.data.total_scheduled} scheduled, ${count} real emails)`
+            );
+        } catch (err) {
+            setErrorMsg(err?.response?.data?.detail || 'Notification failed.');
+        } finally { setNotifying(false); }
+    };
+
+    const handleExport = async () => {
+        if (!selectedDrive) return;
+        setExporting(true);
+        try {
+            const res = await API.get(`/scheduler/export-excel/${selectedDrive}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `schedule_${selectedDrive}.xlsx`;
+            link.click();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            setErrorMsg('Export failed. Generate a schedule first.');
+        } finally { setExporting(false); }
     };
 
     const groupedSchedule = schedule.reduce((acc, slot) => {
@@ -101,14 +130,19 @@ export default function SchedulerView() {
                     </div>
                 </div>
 
-                <button onClick={handleGenerate} disabled={!selectedDrive || loading} style={{ width: '100%', padding: '14px', background: `linear-gradient(135deg, ${theme.accent1}, ${theme.accent2})`, border: 'none', borderRadius: '12px', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
+                <button onClick={handleGenerate} disabled={!selectedDrive || loading} style={{ width: '100%', padding: '14px', background: `linear-gradient(135deg, ${theme.accent1}, ${theme.accent2})`, border: 'none', borderRadius: '12px', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '10px', opacity: !selectedDrive || loading ? 0.6 : 1 }}>
                     {loading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : <Wand2 size={18} />}
                     Auto-Schedule
                 </button>
 
                 {successMsg && (
-                    <div style={{ padding: '12px', background: `${theme.success}15`, color: theme.success, border: `1px solid ${theme.success}30`, borderRadius: '12px', fontSize: '13px', display: 'flex', gap: '8px' }}>
-                        <CheckCircle2 size={16} /> {successMsg}
+                    <div style={{ padding: '12px', background: `${theme.success}15`, color: theme.success, border: `1px solid ${theme.success}30`, borderRadius: '12px', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: 2 }} /> {successMsg}
+                    </div>
+                )}
+                {errorMsg && (
+                    <div style={{ padding: '12px', background: `${theme.danger}15`, color: theme.danger, border: `1px solid ${theme.danger}30`, borderRadius: '12px', fontSize: '13px' }}>
+                        ⚠️ {errorMsg}
                     </div>
                 )}
             </aside>
@@ -122,20 +156,22 @@ export default function SchedulerView() {
                     </div>
                     {schedule.length > 0 && (
                         <div style={{ display: 'flex', gap: '12px' }}>
-                            <button onClick={handleNotify} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: `${theme.accent1}20`, border: `1px solid ${theme.accent1}40`, borderRadius: '12px', color: theme.accent1, cursor: 'pointer', fontWeight: 'bold' }}>
-                                <Send size={16} /> Notify All
+                            <button onClick={() => setNotifyModal(true)} disabled={notifying} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: `${theme.accent2}20`, border: `1px solid ${theme.accent2}40`, borderRadius: '12px', color: theme.accent2, cursor: 'pointer', fontWeight: 'bold', opacity: notifying ? 0.6 : 1 }}>
+                                {notifying ? <span className="spinner" style={{ width: 15, height: 15 }} /> : <Bell size={16} />}
+                                Notify
                             </button>
-                            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '12px', color: theme.text, cursor: 'pointer' }}>
-                                <Download size={16} /> Export
+                            <button onClick={handleExport} disabled={exporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '12px', color: theme.text, cursor: 'pointer', opacity: exporting ? 0.6 : 1 }}>
+                                {exporting ? <span className="spinner" style={{ width: 15, height: 15 }} /> : <Download size={16} />}
+                                Export Excel
                             </button>
                         </div>
                     )}
                 </header>
 
                 {Object.keys(groupedSchedule).length === 0 ? (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: theme.cardBg, borderRadius: '24px', border: `1px dashed ${theme.border}`, color: theme.muted }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: theme.cardBg, borderRadius: '24px', border: `1px dashed ${theme.border}`, color: theme.muted, padding: '80px 0' }}>
                         <LayoutGrid size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
-                        <p>No schedule generated yet. Configure settings to begin.</p>
+                        <p>No schedule generated yet. Select a drive and configure settings to begin.</p>
                     </div>
                 ) : (
                     Object.keys(groupedSchedule).map(dateStr => (
@@ -172,6 +208,41 @@ export default function SchedulerView() {
                     ))
                 )}
             </main>
+
+            {/* ── NOTIFY MODE MODAL ── */}
+            {notifyModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(19,17,28,0.88)', backdropFilter: 'blur(12px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                    <div style={{ background: theme.cardBg, width: '100%', maxWidth: '480px', borderRadius: '20px', border: `1px solid ${theme.border}`, padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '20px', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}><Bell size={20} color={theme.accent2} /> Send Slot Notifications</h2>
+                                <p style={{ margin: '6px 0 0 0', color: theme.muted, fontSize: '13px' }}>{schedule.length} students scheduled</p>
+                            </div>
+                            <button onClick={() => setNotifyModal(false)} style={{ background: '#13111c', border: `1px solid ${theme.border}`, color: theme.muted, cursor: 'pointer', padding: '8px', borderRadius: '10px' }}><X size={18} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <button onClick={() => doNotify('all')} style={{ padding: '20px', background: `${theme.accent1}15`, border: `1px solid ${theme.accent1}40`, borderRadius: '14px', color: 'white', cursor: 'pointer', textAlign: 'left' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                    <Users size={20} color={theme.accent1} />
+                                    <span style={{ fontSize: '15px', fontWeight: '700', color: theme.accent1 }}>Notify All Scheduled Students</span>
+                                </div>
+                                <p style={{ margin: 0, color: theme.muted, fontSize: '13px' }}>
+                                    Sends personalized slot emails to all <strong style={{ color: 'white' }}>{schedule.length} scheduled students</strong>. Real emails only delivered to approved developer list; all others logged.
+                                </p>
+                            </button>
+                            <button onClick={() => doNotify('test')} style={{ padding: '20px', background: `${theme.accent2}15`, border: `1px solid ${theme.accent2}40`, borderRadius: '14px', color: 'white', cursor: 'pointer', textAlign: 'left' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                    <Bell size={20} color={theme.accent2} />
+                                    <span style={{ fontSize: '15px', fontWeight: '700', color: theme.accent2 }}>Notify Developer Test Group</span>
+                                </div>
+                                <p style={{ margin: 0, color: theme.muted, fontSize: '13px' }}>
+                                    Sends a <strong style={{ color: 'white' }}>[TEST]</strong> interview slot email only to: prajwalganiga06, sanvi.s.shetty18, varshiniganiga35, ishwarya9448 @gmail.com
+                                </p>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
