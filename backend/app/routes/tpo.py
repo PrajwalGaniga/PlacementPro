@@ -1,12 +1,47 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
-from app.models.tpo import OTPRequest, OTPVerify
+from app.models.tpo import OTPRequest, OTPVerify, TPOLogin
 from app.utils.otp import send_otp, verify_otp
 from app.utils.jwt_handler import create_access_token
 from app.utils.auth import get_current_user
-from app.utils.student_auth import get_current_student
+
 
 router = APIRouter(prefix="/tpo", tags=["TPO"])
+
+
+@router.post("/login")
+async def tpo_login(request: TPOLogin):
+    """TPO login using email and password."""
+    try:
+        db = get_db()
+        tpo = await db["tpos"].find_one(
+            {"email": request.email, "password": request.password}
+        )
+        if not tpo:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password",
+            )
+        
+        token = create_access_token(
+            data={
+                "sub": request.email,
+                "college_id": tpo["college_id"],
+                "name": tpo.get("name", ""),
+                "role": "tpo"
+            }
+        )
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "college_id": tpo["college_id"],
+            "name": tpo.get("name", ""),
+            "role": "tpo"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 
 @router.get("/colleges")

@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { PlusCircle, Trash2, Activity, Bell, MapPin, Package, Calendar, Users, X, ExternalLink, Search } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { PlusCircle, Trash2, Activity, Bell, MapPin, Package, Calendar, Users, X, ExternalLink, Search, Briefcase, ChevronRight } from 'lucide-react';
 import { getDrives, deleteDrive, notifyStudents, getDriveApplicants, updateApplicantStatus } from '../../api';
-import styles from './DriveList.module.css';
+
+// ── Theme ───────────────────────────────────────────────────────────────────
+const theme = {
+    bg: '#13111c', cardBg: '#1e1c2e', border: '#2d2b42', text: '#e2e8f0', muted: '#94a3b8',
+    accent1: '#8b5cf6', accent2: '#ec4899', success: '#10b981', warning: '#f59e0b', danger: '#f43f5e'
+};
 
 export default function DriveList() {
+    const navigate = useNavigate();
     const [drives, setDrives] = useState([]);
     const [loading, setLoading] = useState(true);
     const [notifyingId, setNotifyingId] = useState(null);
     const [notifyResult, setNotifyResult] = useState({});
+    const [driveSearch, setDriveSearch] = useState('');
 
     // --- Applicants Modal State ---
     const [showModal, setShowModal] = useState(false);
@@ -25,288 +32,241 @@ export default function DriveList() {
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => {
-        fetchDrives();
-    }, []);
+    useEffect(() => { fetchDrives(); }, []);
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Delete this drive?')) return;
-        try {
-            await deleteDrive(id);
-            fetchDrives();
-        } catch {
-            alert('Failed to delete drive');
-        }
+        if (!window.confirm('Are you sure you want to delete this drive?')) return;
+        try { await deleteDrive(id); fetchDrives(); } 
+        catch { alert('Failed to delete drive'); }
     };
 
     const handleNotify = async (drive) => {
         setNotifyingId(drive._id);
         try {
-            const college_id = localStorage.getItem('college_id');
-            const res = await notifyStudents({ drive_id: drive._id, college_id });
-            setNotifyResult(p => ({
-                ...p,
-                [drive._id]: `✓ ${res.data.total_eligible} notified (${res.data.real_emails_sent} emails sent, ${res.data.logged_count} logged)`,
-            }));
+            const res = await notifyStudents({ drive_id: drive._id, college_id: localStorage.getItem('college_id') });
+            setNotifyResult(p => ({ ...p, [drive._id]: { type: 'success', text: `Sent ${res.data.real_emails_sent} emails` }}));
+            setTimeout(() => setNotifyResult(p => ({ ...p, [drive._id]: null })), 4000);
         } catch {
-            setNotifyResult(p => ({ ...p, [drive._id]: '⚠ Notification failed' }));
+            setNotifyResult(p => ({ ...p, [drive._id]: { type: 'error', text: 'Notification failed' }}));
         } finally { setNotifyingId(null); }
     };
 
-    // --- Modal Handlers ---
     const handleViewApplicants = async (drive) => {
-        setModalDrive(drive);
-        setShowModal(true);
-        setLoadingApplicants(true);
-        setSearchTerm("");
+        setModalDrive(drive); setShowModal(true); setLoadingApplicants(true); setSearchTerm("");
         try {
             const res = await getDriveApplicants(drive._id);
             setApplicants(res.data.applicants || []);
-        } catch (err) {
-            console.error("Failed to fetch applicants:", err);
-            alert("Could not load applicants.");
-        } finally {
-            setLoadingApplicants(false);
-        }
+        } catch (err) { alert("Could not load applicants."); } 
+        finally { setLoadingApplicants(false); }
     };
 
     const handleStatusChange = async (appId, newStatus) => {
         try {
             await updateApplicantStatus(appId, newStatus);
-            setApplicants(prev => prev.map(app => 
-                app.application_id === appId ? { ...app, status: newStatus } : app
-            ));
-        } catch (err) {
-            alert("Failed to update status");
-        }
+            setApplicants(prev => prev.map(app => app.application_id === appId ? { ...app, status: newStatus } : app));
+        } catch (err) { alert("Failed to update status"); }
     };
 
-    const getAtsBadgeStyles = (score) => {
-        if (score >= 80) return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: 'rgba(16, 185, 129, 0.3)' }; // Emerald
-        if (score >= 50) return { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' }; // Amber
-        return { bg: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: 'rgba(244, 63, 94, 0.3)' }; // Rose
-    };
+    const filteredDrives = drives.filter(d => 
+        (d.company_name || '').toLowerCase().includes(driveSearch.toLowerCase()) || 
+        (d.job_role || '').toLowerCase().includes(driveSearch.toLowerCase())
+    );
 
     const filteredApplicants = applicants.filter(app => 
         app.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         app.usn.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const getAtsBadgeStyles = (score) => {
+        if (score >= 80) return { bg: `${theme.success}20`, color: theme.success, border: `${theme.success}40` };
+        if (score >= 50) return { bg: `${theme.warning}20`, color: theme.warning, border: `${theme.warning}40` };
+        return { bg: `${theme.danger}20`, color: theme.danger, border: `${theme.danger}40` };
+    };
+
     return (
-        <div className={styles.page}>
-            <div className={styles.pageHeader}>
+        <div style={{ padding: '24px', background: theme.bg, color: theme.text, minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
+            
+            {/* Header & Controls */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '20px' }}>
                 <div>
-                    <h1>Active Drives</h1>
-                    <p>All placement drives created for your institution.</p>
+                    <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        Active Drives <Briefcase size={24} color={theme.accent1} />
+                    </h1>
+                    <p style={{ color: theme.muted, marginTop: '8px' }}>Manage campus placements and track applicants.</p>
                 </div>
-                <Link to="/dashboard/drives/create" className={styles.createBtn}>
-                    <PlusCircle size={16} /> New Drive
-                </Link>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', width: '260px' }}>
+                        <Search size={16} color={theme.muted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input 
+                            type="text" placeholder="Search company or role..." value={driveSearch} onChange={e => setDriveSearch(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px 10px 36px', background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '12px', color: theme.text, outline: 'none', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                    <Link to="/dashboard/drives/create" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: `linear-gradient(135deg, ${theme.accent1}, ${theme.accent2})`, color: 'white', textDecoration: 'none', borderRadius: '12px', fontWeight: '600', transition: 'opacity 0.2s' }}>
+                        <PlusCircle size={18} /> New Drive
+                    </Link>
+                </div>
             </div>
 
+            {/* Drives Grid */}
             {loading ? (
-                <div className={styles.loading}><span className="spinner" /> Loading drives…</div>
-            ) : drives.length === 0 ? (
-                <div className={styles.empty}>
-                    No drives found. <Link to="/dashboard/drives/create">Create one →</Link>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '60px', color: theme.accent1 }}><span className="spinner" style={{ width: 30, height: 30 }} /></div>
+            ) : filteredDrives.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '80px 20px', background: theme.cardBg, borderRadius: '16px', border: `1px dashed ${theme.border}`, color: theme.muted }}>
+                    <Briefcase size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                    <h3>No drives found</h3>
+                    <p style={{ fontSize: '14px', marginBottom: '20px' }}>You haven't created any placement drives yet, or none match your search.</p>
                 </div>
             ) : (
-                <div className={styles.grid}>
-                    {drives.map((drive, idx) => (
-                        <div key={drive._id || idx} className={styles.driveCard} style={{ animationDelay: `${idx * 0.05}s` }}>
-                            {/* Header: logo + name + badges */}
-                            <div className={styles.driveHeader}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    {drive.logo_path
-                                        ? <img src={drive.logo_path} alt="logo" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: 'rgba(255,255,255,0.06)' }} />
-                                        : <div className={styles.logoPlaceholder}>{(drive.company_name || 'C')[0]}</div>}
-                                    <div>
-                                        <div className={styles.companyName}>{drive.company_name}</div>
-                                        <div className={styles.role}>{drive.job_role || drive.role}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '24px' }}>
+                    {filteredDrives.map((drive) => {
+                        const applied = drive.applied_count || 0;
+                        const eligible = drive.eligible_count || 0;
+                        const progressPct = eligible > 0 ? Math.min(100, Math.round((applied / eligible) * 100)) : 0;
+
+                        return (
+                            <div key={drive._id} style={{ background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s, box-shadow 0.2s', ':hover': { transform: 'translateY(-4px)', boxShadow: `0 10px 30px -10px rgba(0,0,0,0.5)` } }}>
+                                
+                                {/* Top Section: Logo & Name */}
+                                <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `1px solid ${theme.border}` }}>
+                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                        <div style={{ width: '50px', height: '50px', background: '#13111c', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: `1px solid ${theme.border}` }}>
+                                            {drive.logo_path ? <img src={drive.logo_path} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: '20px', fontWeight: 'bold', color: theme.accent1 }}>{(drive.company_name || 'C')[0]}</span>}
+                                        </div>
+                                        <div>
+                                            <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '600' }}>{drive.company_name}</h3>
+                                            <p style={{ margin: 0, fontSize: '13px', color: theme.accent1 }}>{drive.job_role}</p>
+                                        </div>
+                                    </div>
+                                    {drive.active && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: `${theme.success}20`, color: theme.success, padding: '4px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}><Activity size={10} /> Live</div>}
+                                </div>
+
+                                {/* Meta Grid */}
+                                <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', flex: 1 }}>
+                                    <div><div style={{ fontSize: '11px', color: theme.muted, textTransform: 'uppercase', marginBottom: '4px' }}>Package</div><div style={{ fontSize: '14px', fontWeight: '500' }}>{drive.package_ctc || 'Not specified'}</div></div>
+                                    <div><div style={{ fontSize: '11px', color: theme.muted, textTransform: 'uppercase', marginBottom: '4px' }}>Location</div><div style={{ fontSize: '14px', fontWeight: '500' }}>{drive.work_location || 'Not specified'}</div></div>
+                                    <div><div style={{ fontSize: '11px', color: theme.muted, textTransform: 'uppercase', marginBottom: '4px' }}>Min CGPA</div><div style={{ fontSize: '14px', fontWeight: '500' }}>{drive.min_cgpa}</div></div>
+                                    <div><div style={{ fontSize: '11px', color: theme.muted, textTransform: 'uppercase', marginBottom: '4px' }}>Deadline</div><div style={{ fontSize: '14px', fontWeight: '500' }}>{drive.application_deadline || '—'}</div></div>
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div style={{ padding: '0 20px 20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
+                                        <span style={{ color: theme.muted }}>Application Progress</span>
+                                        <span style={{ fontWeight: '600' }}>{applied} / {eligible}</span>
+                                    </div>
+                                    <div style={{ height: '6px', background: '#13111c', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{ width: `${progressPct}%`, height: '100%', background: `linear-gradient(90deg, ${theme.accent1}, ${theme.accent2})`, borderRadius: '4px' }} />
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                                    {drive.active && <span className={styles.activeBadge}><Activity size={10} /> Active</span>}
-                                    {drive.industry_category && (
-                                        <span className={styles.industryBadge}>{drive.industry_category}</span>
-                                    )}
-                                </div>
-                            </div>
 
-                            <div className={styles.metaGrid}>
-                                {drive.package_ctc && (
-                                    <div className={styles.meta}>
-                                        <span className={styles.metaKey}><Package size={10} /> Package</span>
-                                        <span className={styles.metaVal}>{drive.package_ctc}</span>
+                                {/* Action Buttons */}
+                                <div style={{ padding: '16px 20px', background: '#181622', borderTop: `1px solid ${theme.border}`, display: 'flex', gap: '10px' }}>
+                                    <button onClick={() => handleViewApplicants(drive)} style={{ flex: 1, padding: '10px', background: `${theme.accent1}15`, color: theme.accent1, border: `1px solid ${theme.accent1}30`, borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}>
+                                        <Users size={14} /> Applicants
+                                    </button>
+                                    <button onClick={() => handleNotify(drive)} disabled={notifyingId === drive._id} style={{ padding: '10px', background: 'transparent', color: theme.text, border: `1px solid ${theme.border}`, borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Send Email Invites">
+                                        {notifyingId === drive._id ? <span className="spinner" style={{ width: 16, height: 16 }} /> : <Bell size={16} />}
+                                    </button>
+                                    <button onClick={() => handleDelete(drive._id)} style={{ padding: '10px', background: 'transparent', color: theme.danger, border: `1px solid ${theme.border}`, borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Delete Drive">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                                
+                                {/* Notification Toast inside card */}
+                                {notifyResult[drive._id] && (
+                                    <div style={{ position: 'absolute', bottom: '70px', left: '20px', right: '20px', padding: '10px', background: notifyResult[drive._id].type === 'success' ? `${theme.success}20` : `${theme.danger}20`, border: `1px solid ${notifyResult[drive._id].type === 'success' ? theme.success : theme.danger}`, color: notifyResult[drive._id].type === 'success' ? theme.success : theme.danger, borderRadius: '8px', fontSize: '12px', textAlign: 'center', backdropFilter: 'blur(4px)', animation: 'fadeIn 0.3s' }}>
+                                        {notifyResult[drive._id].text}
                                     </div>
                                 )}
-                                {drive.work_location && (
-                                    <div className={styles.meta}>
-                                        <span className={styles.metaKey}><MapPin size={10} /> Location</span>
-                                        <span className={styles.metaVal}>{drive.work_location}</span>
-                                    </div>
-                                )}
-                                <div className={styles.meta}>
-                                    <span className={styles.metaKey}>Min CGPA</span>
-                                    <span className={styles.metaVal}>{drive.min_cgpa}</span>
-                                </div>
-                                <div className={styles.meta}>
-                                    <span className={styles.metaKey}>Max Backlogs</span>
-                                    <span className={styles.metaVal}>{drive.max_backlogs}</span>
-                                </div>
-                                {drive.application_deadline && (
-                                    <div className={styles.meta}>
-                                        <span className={styles.metaKey}><Calendar size={10} /> Deadline</span>
-                                        <span className={styles.metaVal}>{drive.application_deadline}</span>
-                                    </div>
-                                )}
                             </div>
-                            
-                            {/* Progress & Applicant Button Row */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    <strong style={{ color: 'var(--text-primary)' }}>{drive.applied_count || 0}</strong> applied of <strong style={{ color: 'var(--text-primary)' }}>{drive.eligible_count || 0}</strong> eligible
-                                </div>
-                                <button 
-                                    onClick={() => handleViewApplicants(drive)}
-                                    style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', transition: 'all 0.2s' }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)'}
-                                >
-                                    <Users size={14} /> View Applicants
-                                </button>
-                            </div>
-
-                            {(drive.eligible_branches?.length > 0 || drive.branches?.length > 0) && (
-                                <div className={styles.branches}>
-                                    {(drive.eligible_branches || drive.branches).map(b => (
-                                        <span key={b} className={styles.branchTag}>{b}</span>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Actions row */}
-                            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                                <button
-                                    className={styles.notifyBtn}
-                                    onClick={() => handleNotify(drive)}
-                                    disabled={notifyingId === drive._id}
-                                >
-                                    {notifyingId === drive._id
-                                        ? <><span className="spinner" style={{ width: 12, height: 12 }} /> Notifying…</>
-                                        : <><Bell size={13} /> Notify Eligible</>}
-                                </button>
-                                <button
-                                    className={styles.deleteBtn}
-                                    onClick={() => handleDelete(drive._id)}
-                                >
-                                    <Trash2 size={13} /> Delete
-                                </button>
-                            </div>
-
-                            {notifyResult[drive._id] && (
-                                <div style={{ marginTop: 8, fontSize: 12, padding: '6px 10px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 6, color: 'var(--emerald)' }}>
-                                    {notifyResult[drive._id]}
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
-            {/* --- APPLICANTS MODAL --- */}
+            {/* ── APPLICANTS MODAL ── */}
             {showModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-                    <div style={{ background: '#1e293b', width: '100%', maxWidth: '1000px', maxHeight: '90vh', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(19, 17, 28, 0.85)', backdropFilter: 'blur(12px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', animation: 'fadeIn 0.2s' }}>
+                    <div style={{ background: theme.cardBg, width: '100%', maxWidth: '1100px', height: '85vh', borderRadius: '24px', border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', overflow: 'hidden' }}>
                         
                         {/* Modal Header */}
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <h2 style={{ margin: 0, fontSize: '20px', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Users size={20} color="#8b5cf6" />
-                                    {modalDrive?.company_name} Applicants
-                                </h2>
-                                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>{modalDrive?.job_role}</p>
+                        <div style={{ padding: '24px 32px', borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: `linear-gradient(to right, ${theme.cardBg}, #13111c)` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ width: '48px', height: '48px', background: '#13111c', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${theme.border}` }}>
+                                    {modalDrive?.logo_path ? <img src={modalDrive.logo_path} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Briefcase size={20} color={theme.accent1} />}
+                                </div>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '20px', color: 'white' }}>{modalDrive?.company_name} Pipeline</h2>
+                                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: theme.muted }}>{modalDrive?.job_role} • {applicants.length} Applicants</p>
+                                </div>
                             </div>
-                            <button onClick={() => setShowModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}>
+                            <button onClick={() => setShowModal(false)} style={{ background: '#13111c', border: `1px solid ${theme.border}`, color: theme.muted, cursor: 'pointer', padding: '10px', borderRadius: '12px', transition: 'all 0.2s' }}>
                                 <X size={20} />
                             </button>
                         </div>
 
-                        {/* Search Bar */}
-                        <div style={{ padding: '16px 24px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ position: 'relative', width: '300px' }}>
-                                <Search size={16} color="#64748b" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search by name or USN..." 
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    style={{ width: '100%', padding: '10px 10px 10px 36px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '14px', outline: 'none' }}
-                                />
+                        {/* Search & Filters */}
+                        <div style={{ padding: '16px 32px', background: '#13111c', borderBottom: `1px solid ${theme.border}`, display: 'flex', gap: '16px' }}>
+                            <div style={{ position: 'relative', width: '320px' }}>
+                                <Search size={16} color={theme.muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                                <input type="text" placeholder="Search by name or USN..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 16px 12px 42px', background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: '12px', color: 'white', fontSize: '14px', outline: 'none' }} />
                             </div>
                         </div>
 
                         {/* Modal Body / Table */}
-                        <div style={{ overflowY: 'auto', flex: 1, padding: '24px' }}>
+                        <div style={{ overflowY: 'auto', flex: 1, padding: '0 32px' }}>
                             {loadingApplicants ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8' }}>
-                                    <span className="spinner" style={{ width: 24, height: 24, marginBottom: 16 }} />
-                                    Analyzing Resumes & Fetching Data...
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: theme.accent1 }}>
+                                    <span className="spinner" style={{ width: 32, height: 32, marginBottom: 16 }} />
+                                    AI is analyzing resumes...
                                 </div>
                             ) : filteredApplicants.length === 0 ? (
-                                <div style={{ textAlign: 'center', color: '#64748b', padding: '40px 0' }}>
-                                    No applicants found matching your criteria.
+                                <div style={{ textAlign: 'center', color: theme.muted, padding: '80px 0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <Users size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                                    No applicants match your search.
                                 </div>
                             ) : (
-                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                    <thead>
-                                        <tr style={{ color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                            <th style={{ padding: '0 16px 16px 16px', fontWeight: '600' }}>Student</th>
-                                            <th style={{ padding: '0 16px 16px 16px', fontWeight: '600' }}>Branch</th>
-                                            <th style={{ padding: '0 16px 16px 16px', fontWeight: '600' }}>Resume</th>
-                                            <th style={{ padding: '0 16px 16px 16px', fontWeight: '600' }}>ATS Match</th>
-                                            <th style={{ padding: '0 16px 16px 16px', fontWeight: '600' }}>Pipeline Status</th>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginTop: '16px' }}>
+                                    <thead style={{ position: 'sticky', top: 0, background: theme.cardBg, zIndex: 10 }}>
+                                        <tr style={{ color: theme.muted, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            <th style={{ padding: '16px 16px 16px 0', borderBottom: `1px solid ${theme.border}`, fontWeight: '600' }}>Candidate</th>
+                                            <th style={{ padding: '16px', borderBottom: `1px solid ${theme.border}`, fontWeight: '600' }}>Branch</th>
+                                            <th style={{ padding: '16px', borderBottom: `1px solid ${theme.border}`, fontWeight: '600' }}>Resume</th>
+                                            <th style={{ padding: '16px', borderBottom: `1px solid ${theme.border}`, fontWeight: '600' }}>ATS Match</th>
+                                            <th style={{ padding: '16px 0 16px 16px', borderBottom: `1px solid ${theme.border}`, fontWeight: '600' }}>Pipeline Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredApplicants.map((app) => {
                                             const atsStyles = getAtsBadgeStyles(app.ats_score);
                                             return (
-                                                <tr key={app.application_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                    <td style={{ padding: '16px' }}>
-                                                        <div style={{ color: 'white', fontWeight: '500', fontSize: '14px' }}>{app.name}</div>
-                                                        <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>{app.usn}</div>
+                                                <tr key={app.application_id} style={{ borderBottom: `1px solid ${theme.border}`, transition: 'background 0.2s', ':hover': { background: '#13111c' } }}>
+                                                    <td style={{ padding: '20px 16px 20px 0' }}>
+                                                        <div style={{ color: 'white', fontWeight: '600', fontSize: '15px' }}>{app.name}</div>
+                                                        <div style={{ color: theme.muted, fontSize: '12px', marginTop: '4px', fontFamily: 'monospace' }}>{app.usn}</div>
                                                     </td>
-                                                    <td style={{ padding: '16px', color: '#cbd5e1', fontSize: '14px' }}>{app.branch}</td>
-                                                    <td style={{ padding: '16px' }}>
+                                                    <td style={{ padding: '20px 16px', color: '#cbd5e1', fontSize: '14px' }}>
+                                                        <span style={{ background: '#13111c', border: `1px solid ${theme.border}`, padding: '4px 10px', borderRadius: '20px', fontSize: '12px' }}>{app.branch}</span>
+                                                    </td>
+                                                    <td style={{ padding: '20px 16px' }}>
                                                         {app.resume_url ? (
-                                                            <a href={app.resume_url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#6366f1', textDecoration: 'none', fontSize: '13px', fontWeight: '500', background: 'rgba(99, 102, 241, 0.1)', padding: '6px 10px', borderRadius: '6px' }}>
-                                                                View PDF <ExternalLink size={14} />
+                                                            <a href={app.resume_url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: theme.accent1, textDecoration: 'none', fontSize: '13px', fontWeight: '600', background: `${theme.accent1}15`, padding: '8px 12px', borderRadius: '8px', transition: 'all 0.2s' }}>
+                                                                View <ExternalLink size={14} />
                                                             </a>
                                                         ) : (
-                                                            <span style={{ color: '#64748b', fontSize: '13px' }}>Not provided</span>
+                                                            <span style={{ color: theme.muted, fontSize: '13px', fontStyle: 'italic' }}>Not provided</span>
                                                         )}
                                                     </td>
-                                                    <td style={{ padding: '16px' }}>
-                                                        <div style={{ display: 'inline-flex', alignItems: 'center', background: atsStyles.bg, color: atsStyles.color, border: `1px solid ${atsStyles.border}`, padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: '700' }}>
+                                                    <td style={{ padding: '20px 16px' }}>
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', background: atsStyles.bg, color: atsStyles.color, border: `1px solid ${atsStyles.border}`, padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '700' }}>
                                                             {app.ats_score}% Match
                                                         </div>
                                                     </td>
-                                                    <td style={{ padding: '16px' }}>
+                                                    <td style={{ padding: '20px 0 20px 16px' }}>
                                                         <select 
-                                                            value={app.status}
-                                                            onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
-                                                            style={{ 
-                                                                background: '#0f172a', 
-                                                                color: 'white', 
-                                                                border: '1px solid rgba(255,255,255,0.1)', 
-                                                                padding: '8px 12px', 
-                                                                borderRadius: '6px', 
-                                                                fontSize: '13px',
-                                                                outline: 'none',
-                                                                cursor: 'pointer'
-                                                            }}
+                                                            value={app.status} onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
+                                                            style={{ background: '#13111c', color: 'white', border: `1px solid ${theme.border}`, padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', outline: 'none', cursor: 'pointer', width: '100%' }}
                                                         >
                                                             <option value="Applied">Applied</option>
                                                             <option value="Shortlisted">Shortlisted</option>

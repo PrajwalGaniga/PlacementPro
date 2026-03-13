@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ name }} - Resume</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 40px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2.8em;
+            color: #2c3e50;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            font-size: 0.95em;
+            color: #555;
+        }
+
+        .contact-info span {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .contact-info a {
+            color: #007bff;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .contact-info a:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+        section {
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-size: 1.6em;
+            color: #2c3e50;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        h3 {
+            font-size: 1.25em;
+            color: #34495e;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+
+        h3 span.date {
+            float: right;
+            font-weight: normal;
+            font-size: 0.9em;
+            color: #777;
+        }
+
+        ul {
+            list-style-type: disc;
+            margin: 0 0 15px 25px;
+            padding: 0;
+        }
+
+        ul li {
+            margin-bottom: 8px;
+            color: #444;
+        }
+
+        .skills-category {
+            margin-bottom: 15px;
+        }
+
+        .skills-category strong {
+            color: #007bff;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .skills-category ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .skills-category li {
+            background-color: #e9f5ff;
+            color: #007bff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .experience-item, .project-item, .research-item {
+            margin-bottom: 25px;
+        }
+
+        .experience-item p, .project-item p, .research-item p {
+            margin: 5px 0 10px 0;
+            font-size: 0.95em;
+        }
+
+        .education-item h3 {
+            margin-bottom: 5px;
+        }
+
+        .education-item p {
+            margin: 0 0 5px 0;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .awards ul {
+            list-style-type: none;
+            margin-left: 0;
+        }
+
+        .awards li {
+            margin-bottom: 10px;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        .awards li:before {
+            content: '🏆'; /* Or any other icon */
+            position: absolute;
+            left: 0;
+            color: #ffc107;
+            font-size: 1em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px auto;
+                padding: 20px;
+            }
+            header h1 {
+                font-size: 2em;
+            }
+            h2 {
+                font-size: 1.4em;
+            }
+            h3 {
+                font-size: 1.1em;
+            }
+            .contact-info {
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+            }
+            h3 span.date {
+                float: none;
+                display: block;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ name }}</h1>
+            <div class="contact-info">
+                <span>Manglore, D.K, Karnataka</span>
+                <span>•</span>
+                <span>911 068 7983</span>
+                <span>•</span>
+                <span><a href="mailto:{{ email }}">{{ email }}</a></span>
+                <span>•</span>
+                <span>Portfolio: <a href="https://prajwal-p-portfolio.netlify.app" target="_blank">prajwal-p-portfolio.netlify.app</a></span>
+                <span>•</span>
+                <span>LinkedIn: <a href="https://linkedin.com/in/prajwalganiga" target="_blank">linkedin.com/in/prajwalganiga</a></span>
+                <span>•</span>
+                <span>GitHub: <a href="https://github.com/PrajwalGaniga" target="_blank">github.com/PrajwalGaniga</a></span>
+            </div>
+        </header>
+
+        <section id="summary">
+            <h2>Summary</h2>
+            <p>
+                Full-Stack AI Developer and Researcher specializing in the integration of Ayurvedic principles with Deep Learning. Main
+                author of IEEE research on medical NMT and 2nd Place winner at AYUSH HABBA 2026. Proven track record in building
+                predictive health models and leading high-stakes technical projects from ideation to market.
+            </p>
+        </section>
+
+        <section id="skills">
+            <h2>Core Technical Skills</h2>
+            <div class="skills-category">
+                <strong>AI/ML:</strong>
+                <ul>
+                    <li>Deep Learning</li>
+                    <li>NMT</li>
+                    <li>YOLOv8</li>
+                    <li>Transformers</li>
+                    <li>BERT</li>
+                    <li>Predictive Risk Modeling</li>
+                </ul>
+            </div>
+            <div class="skills-category">
+                <strong>Health-Tech:</strong>
+                <ul>
+                    <li>Computable Health Modeling (Prakriti, Agni, Dosha)</li>
+                    <li>CDSS</li>
+                    <li>Ojas Vitality Indexing</li>
+                </ul>
+            </div>
+            <div class="skills-category">
+                <strong>Full-Stack:</strong>
+                <ul>
+                    <li>Flutter (Mobile UI/UX)</li>
+                    <li>FastAPI (Backend)</li>
+                    <li>MongoDB</li>
+                    <li>RESTful API Design</li>
+                </ul>
+            </div>
+            <div class="skills-category">
+                <strong>Professional:</strong>
+                <ul>
+                    <li>Git</li>
+                    <li>Docker</li>
+                    <li>SCRUM Methodology</li>
+                    <li>Technical Project Management</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="research-publications">
+            <h2>Research & Publications</h2>
+            {% for res in research %}
+            <div class="research-item">
+                <h3>{{ res.role }} | {{ res.publication }}</h3>
+                <p><em>"{{ res.title }}"</em></p>
+                <ul>
+                    {% for point in res.description_points %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section id="projects">
+            <h2>Featured AI Projects</h2>
+            {% for proj in projects %}
+            <div class="project-item">
+                <h3>{{ proj.name }} {% if proj.award %}<span style="font-size: 0.8em; font-weight: normal; color: #007bff;">({{ proj.award }})</span>{% endif %}</h3>
+                <ul>
+                    {% for point in proj.description_points %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section id="experience">
+            <h2>Professional Experience</h2>
+            {% for exp in experience %}
+            <div class="experience-item">
+                <h3>{{ exp.role }} | {{ exp.company }}<span class="date">{{ exp.dates }}</span></h3>
+                <ul>
+                    {% for point in exp.description_points %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section id="education">
+            <h2>Education</h2>
+            <div class="education-item">
+                <h3>BACHELOR OF COMPUTER SCIENCE AND DESIGN ENGINEERING <span class="date">2023 - 2027</span></h3>
+                <p><strong>Srinivas Institute of Technology</strong></p>
+                <ul>
+                    <li>CGPA of {{ cgpa }}, Academic Rank #1: Held top position in the department for 3 consecutive semesters</li>
+                    <li>Honored with multiple Academic Excellence Awards for sustained high performance.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="awards">
+            <h2>Awards, Honors & Leadership</h2>
+            <ul>
+                <li>2nd Place: AYUSH HABBA 2026 IDEA Hackathon (70+ Teams) & Solve-A-thon.</li>
+                <li>Leadership: Event Lead for Technical Treasure Hunt; Member of College Volleyball Team.</li>
+            </ul>
+        </section>
+    </div>
+</body>
+</html>

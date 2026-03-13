@@ -4,8 +4,13 @@ from typing import Optional
 
 class TPO(BaseModel):
     college_id: str
+    college_name: str
     name: str
     email: EmailStr
+    password: str
+    place: str
+    state: str
+    country: str
 
 
 class OTPRequest(BaseModel):
@@ -16,3 +21,13 @@ class OTPRequest(BaseModel):
 class OTPVerify(BaseModel):
     email: EmailStr
     otp: str
+
+
+class TPOLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class SuperAdminLogin(BaseModel):
+    email: EmailStr
+    password: str

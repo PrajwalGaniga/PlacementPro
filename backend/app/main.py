@@ -2,9 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.database import connect_db, close_db
-from app.routes import tpo, drive, student, scheduler, top_resume, bot
+from app.routes import tpo, drive, student, scheduler, top_resume, bot, admin
 import os
 from app.routes import admin_applications
+from app.routes import ai_analyzer
 from app.routes.alumni import router as alumni_router, admin_alumni, student_alumni_router
 
 
@@ -40,6 +41,7 @@ async def shutdown_event():
 
 
 app.include_router(tpo.router)
+app.include_router(admin.router)
 app.include_router(drive.router)
 app.include_router(student.router)
 app.include_router(scheduler.router)
@@ -51,6 +53,8 @@ app.include_router(admin_alumni)            # /admin/alumni/*
 app.include_router(student_alumni_router)   # /student/alumni-jobs, /student/alumni-sessions, etc.
 # PlacementBot V2 – Hybrid AI Career Analyzer
 app.include_router(bot.router)              # /bot/chat
+# AI Analyzer + Excel Exports
+app.include_router(ai_analyzer.router)     # /tpo/export-students, /tpo/analyze-excel, /tpo/export-schedule
 
 
 @app.get("/")

@@ -28,8 +28,14 @@ API.interceptors.response.use(
 export const getColleges = () => API.get('/tpo/colleges');
 export const sendOtp = (email, cid) => API.post('/tpo/send-otp', { email, college_id: cid });
 export const verifyOtp = (email, otp) => API.post('/tpo/verify-otp', { email, otp });
+export const tpoLogin = (data) => API.post('/tpo/login', data); // Password login
 export const getStats = () => API.get('/tpo/stats');
 export const getProfile = () => API.get('/tpo/profile');
+
+// ── Super Admin ───────────────────────────────────────────────────
+export const adminLogin = (data) => API.post('/admin/login', data);
+export const addTPO = (data) => API.post('/admin/tpo/add', data);
+export const getTPOs = () => API.get('/admin/tpo/list');
 
 // ── Drive ────────────────────────────────────────────────────────
 export const parseJD = (fd) => API.post('/drive/parse-jd', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -70,6 +76,18 @@ export const getAlumniStats = () => API.get('/admin/alumni/stats');
 export const verifyAlumni = (id, action) => API.put(`/admin/alumni/${id}/verify?action=${action}`);
 export const revokeAlumni = (id) => API.delete(`/admin/alumni/${id}`);
 export const getAlumniDetail = (id) => API.get(`/admin/alumni/${id}/detail`);
+
+// ── AI Analyzer + Excel Exports ────────────────────────────────────────────
+export const exportStudentsExcel = () =>
+    API.get('/tpo/export-students', { responseType: 'blob' });
+
+export const analyzeExcel = (formData) =>
+    API.post('/tpo/analyze-excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+export const exportScheduleExcel = (driveId) =>
+    API.get(`/tpo/export-schedule/${driveId}`, { responseType: 'blob' });
 
 
 export default API;
